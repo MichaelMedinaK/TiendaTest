@@ -11,7 +11,7 @@ import { InactiveUserError, InvalidCredentialsError } from '@/lib/errors';
 import { verifyPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { createSessionCookie, destroySessionCookie } from '@/lib/session';
-import { requireEmail, requireText } from '@/lib/validation';
+import { requireUsername, requireText } from '@/lib/validation';
 
 export interface AuthenticatedUser {
   id: string;
@@ -26,7 +26,7 @@ export interface AuthenticatedUser {
  */
 export async function login(email: string, password: string): Promise<ActionResult<AuthenticatedUser>> {
   return executeAction('auth.login', async (trace) => {
-    const normalizedEmail = requireEmail(email);
+    const normalizedEmail = requireUsername(email);
     const plainPassword = requireText(password, 'contrasena');
     trace.setBusinessId(normalizedEmail);
     trace.addStep('credenciales-validadas');

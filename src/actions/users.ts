@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminSession, requireSession } from '@/lib/session';
 import {
   optionalText,
-  requireEmail,
+  requireUsername,
   requireEnumValue,
   requirePassword,
   requireText,
@@ -59,7 +59,7 @@ export async function createUser(input: CreateUserInput): Promise<ActionResult<U
   return executeAction('users.createUser', async (trace) => {
     await requireAdminSession();
 
-    const email = requireEmail(input.email);
+    const email = requireUsername(input.email);
     const password = requirePassword(input.password);
     const role = requireEnumValue(input.role, Role, 'rol');
     const name = optionalText(input.name);

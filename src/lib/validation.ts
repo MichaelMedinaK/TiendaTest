@@ -19,14 +19,19 @@ export function optionalText(value: unknown, maxLength = 255): string | null {
   return text ? text.slice(0, maxLength) : null;
 }
 
-export function requireEmail(value: unknown): string {
-  const email = requireText(value, 'correo').toLowerCase();
+/** Identificador de acceso: texto libre sin espacios (puede ser un correo, un alias, etc.). */
+export function requireUsername(value: unknown): string {
+  const username = requireText(value, 'usuario', 100).toLowerCase();
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new ValidationError('El correo no tiene un formato valido');
+  if (/\s/.test(username)) {
+    throw new ValidationError('El usuario no puede contener espacios');
   }
 
-  return email;
+  if (username.length < 3) {
+    throw new ValidationError('El usuario debe tener al menos 3 caracteres');
+  }
+
+  return username;
 }
 
 export function requirePassword(value: unknown, minLength = 6): string {

@@ -43,7 +43,7 @@ export class ValidationError extends BusinessError {}
 
 export class EmailAlreadyRegisteredError extends BusinessError {
   constructor(email: string) {
-    super(`El correo ${email} ya esta registrado`);
+    super(`El usuario ${email} ya esta registrado`);
   }
 }
 

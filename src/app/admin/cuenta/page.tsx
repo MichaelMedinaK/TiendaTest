@@ -29,7 +29,7 @@ export default async function AccountPage() {
           <span className="font-medium text-slate-900">{session.name ?? 'Sin nombre'}</span>
         </p>
         <p>
-          <span className="text-slate-500">Correo:</span>{' '}
+          <span className="text-slate-500">Usuario:</span>{' '}
           <span className="font-medium text-slate-900">{session.email}</span>
         </p>
         <p>

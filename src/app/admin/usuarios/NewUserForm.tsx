@@ -57,9 +57,9 @@ export function NewUserForm() {
 
         <div>
           <label className={LABEL_CLASS} htmlFor="email">
-            Correo
+            Usuario
           </label>
-          <input id="email" name="email" type="email" required className={INPUT_CLASS} placeholder="staff@tienda.com" />
+          <input id="email" name="email" type="text" required className={INPUT_CLASS} placeholder="maria" />
         </div>
 
         <div>

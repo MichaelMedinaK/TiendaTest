@@ -41,15 +41,15 @@ export function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className={LABEL_CLASS} htmlFor="email">
-          Correo electronico
+          Usuario
         </label>
         <input
           id="email"
           name="email"
-          type="email"
-          autoComplete="email"
+          type="text"
+          autoComplete="username"
           required
-          placeholder="admin@tiendatest.com"
+          placeholder="admin"
           className={INPUT_CLASS}
         />
       </div>

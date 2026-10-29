@@ -1,7 +1,7 @@
 import { PrismaClient, Role } from '@prisma/client';
 
 import { hashPassword } from '../src/lib/password';
-import { requireEmail, requirePassword } from '../src/lib/validation';
+import { requireUsername, requirePassword } from '../src/lib/validation';
 
 const prisma = new PrismaClient();
 
@@ -14,7 +14,7 @@ const DEMO_PRODUCTS = [
 ] as const;
 
 async function seedDefaultAdmin(): Promise<void> {
-  const email = requireEmail(process.env.SEED_ADMIN_EMAIL);
+  const email = requireUsername(process.env.SEED_ADMIN_EMAIL);
   const password = requirePassword(process.env.SEED_ADMIN_PASSWORD, 12);
   const name = process.env.SEED_ADMIN_NAME?.trim() || 'Administrador Principal';
   const existingAdmin = await prisma.user.findUnique({ where: { email } });
