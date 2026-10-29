@@ -15,6 +15,21 @@ export class InvalidCredentialsError extends BusinessError {
   }
 }
 
+export class UserDoesNotExistError extends BusinessError {
+  constructor(username: string) {
+    super(`El usuario "${username}" no existe. Revisa que este bien escrito`);
+  }
+}
+
+export class IncorrectPasswordError extends BusinessError {
+  constructor() {
+    super('La contrasena es incorrecta. Verifica mayusculas, minusculas y vuelve a intentarlo');
+  }
+}
+
+/** Fallo de infraestructura con un mensaje accionable (base de datos, configuracion). */
+export class ServiceUnavailableError extends BusinessError {}
+
 export class InactiveUserError extends BusinessError {
   constructor() {
     super('El usuario esta desactivado. Contacta al administrador');

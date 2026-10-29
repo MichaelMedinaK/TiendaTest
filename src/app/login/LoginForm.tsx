@@ -24,16 +24,20 @@ export function LoginForm() {
     setErrorMessage(null);
 
     startTransition(async () => {
-      const result = await login(email, password);
+      try {
+        const result = await login(email, password);
 
-      if (!result.success) {
-        setErrorMessage(result.error);
-        return;
+        if (!result.success) {
+          setErrorMessage(result.error);
+          return;
+        }
+
+        // refresh() obliga a recargar el layout del panel con la sesion recien creada.
+        router.replace(searchParams.get('redirectTo') ?? ROLE_HOME_ROUTE[result.data.role]);
+        router.refresh();
+      } catch {
+        setErrorMessage('No se pudo comunicar con el servidor. Revisa tu conexion a internet o que la aplicacion este en ejecucion');
       }
-
-      // refresh() obliga a recargar el layout del panel con la sesion recien creada.
-      router.replace(searchParams.get('redirectTo') ?? ROLE_HOME_ROUTE[result.data.role]);
-      router.refresh();
     });
   };
 

@@ -7,7 +7,8 @@ import type { Role } from '@prisma/client';
 import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { LOGIN_ROUTE } from '@/lib/constants';
-import { InactiveUserError, InvalidCredentialsError } from '@/lib/errors';
+import { IncorrectPasswordError, InactiveUserError, UserDoesNotExistError } from '@/lib/errors';
+import { toLoginInfrastructureError } from '@/lib/login-errors';
 import { verifyPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { createSessionCookie, destroySessionCookie } from '@/lib/session';
@@ -18,6 +19,14 @@ export interface AuthenticatedUser {
   email: string;
   name: string | null;
   role: Role;
+}
+
+async function findUserOrExplain(email: string) {
+  try {
+    return await prisma.user.findUnique({ where: { email } });
+  } catch (error) {
+    throw toLoginInfrastructureError(error);
+  }
 }
 
 /**
@@ -31,10 +40,10 @@ export async function login(email: string, password: string): Promise<ActionResu
     trace.setBusinessId(normalizedEmail);
     trace.addStep('credenciales-validadas');
 
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const user = await findUserOrExplain(normalizedEmail);
 
     if (!user) {
-      throw new InvalidCredentialsError();
+      throw new UserDoesNotExistError(normalizedEmail);
     }
 
     if (!user.isActive) {
@@ -44,17 +53,21 @@ export async function login(email: string, password: string): Promise<ActionResu
     const isPasswordValid = await verifyPassword(plainPassword, user.password);
 
     if (!isPasswordValid) {
-      throw new InvalidCredentialsError();
+      throw new IncorrectPasswordError();
     }
 
     trace.addStep('password-verificado');
 
-    await createSessionCookie({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    });
+    try {
+      await createSessionCookie({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      });
+    } catch (error) {
+      throw toLoginInfrastructureError(error);
+    }
 
     trace.addStep('cookie-sesion-emitida');
 
