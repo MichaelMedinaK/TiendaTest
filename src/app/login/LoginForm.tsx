@@ -7,7 +7,7 @@ import { FormEvent, useState, useTransition } from 'react';
 import { login } from '@/actions/auth';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
-import { DASHBOARD_ROUTE } from '@/lib/constants';
+import { ROLE_HOME_ROUTE } from '@/lib/permissions';
 
 export function LoginForm() {
   const router = useRouter();
@@ -32,7 +32,7 @@ export function LoginForm() {
       }
 
       // refresh() obliga a recargar el layout del panel con la sesion recien creada.
-      router.replace(searchParams.get('redirectTo') ?? DASHBOARD_ROUTE);
+      router.replace(searchParams.get('redirectTo') ?? ROLE_HOME_ROUTE[result.data.role]);
       router.refresh();
     });
   };

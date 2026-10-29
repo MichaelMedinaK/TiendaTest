@@ -21,7 +21,8 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrador',
-  STAFF: 'Staff',
+  STAFF: 'Tendero',
+  COURIER: 'Domiciliario',
 };
 
 export const PAYMENT_STATUS_BADGES: Record<PaymentStatus, string> = {

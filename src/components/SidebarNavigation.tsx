@@ -1,30 +1,32 @@
 'use client';
 
-import { FileText, LayoutDashboard, Package, ShoppingCart, UserCog, Users } from 'lucide-react';
+import { FileText, LayoutDashboard, Package, ShoppingCart, Truck, UserCog, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import type { Role } from '@prisma/client';
 
+import { canAccessRoute } from '@/lib/permissions';
+
 interface NavigationItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
-  allowedRoles?: Role[];
 }
 
 const NAVIGATION_ITEMS: NavigationItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/ventas', label: 'Ventas', icon: ShoppingCart },
+  { href: '/admin/entregas', label: 'Entregas', icon: Truck },
   { href: '/admin/inventario', label: 'Inventario', icon: Package },
   { href: '/admin/reporte', label: 'Reporte', icon: FileText },
-  { href: '/admin/usuarios', label: 'Usuarios', icon: Users, allowedRoles: ['ADMIN'] },
+  { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { href: '/admin/cuenta', label: 'Mi cuenta', icon: UserCog },
 ];
 
 export function SidebarNavigation({ role }: { role: Role }) {
   const pathname = usePathname();
-  const visibleItems = NAVIGATION_ITEMS.filter((item) => !item.allowedRoles || item.allowedRoles.includes(role));
+  const visibleItems = NAVIGATION_ITEMS.filter((item) => canAccessRoute(role, item.href));
 
   return (
     <nav className="flex flex-col gap-1">

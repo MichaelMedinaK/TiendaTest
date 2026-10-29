@@ -7,7 +7,7 @@ import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { ProductNotFoundError } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/lib/session';
+import { requireRole } from '@/lib/session';
 import {
   optionalText,
   requireNonNegativeInteger,
@@ -27,7 +27,7 @@ export interface CreateProductInput {
 
 export async function getProducts(): Promise<ActionResult<Product[]>> {
   return executeAction('products.getProducts', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
 
     const products = await prisma.product.findMany({ orderBy: { name: 'asc' } });
     trace.addStep(`productos-listados:${products.length}`);
@@ -38,7 +38,7 @@ export async function getProducts(): Promise<ActionResult<Product[]>> {
 
 export async function createProduct(input: CreateProductInput): Promise<ActionResult<Product>> {
   return executeAction('products.createProduct', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
 
     const name = requireText(input.name, 'nombre');
     const price = requirePositiveNumber(input.price, 'precio');
@@ -59,7 +59,7 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
 
 export async function updateStock(productId: string, newStock: number): Promise<ActionResult<Product>> {
   return executeAction('products.updateStock', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
     trace.setBusinessId(productId);
 
     const stock = requireNonNegativeInteger(newStock, 'stock');

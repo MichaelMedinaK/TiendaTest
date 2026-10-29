@@ -6,7 +6,7 @@ import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { LOW_STOCK_THRESHOLD } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/lib/session';
+import { requireRole } from '@/lib/session';
 
 export interface DashboardMetrics {
   totalSalesAmount: number;
@@ -20,7 +20,7 @@ export interface DashboardMetrics {
 /** Metricas rapidas del panel. Se resuelven en paralelo para una sola ida a base de datos logica. */
 export async function getDashboardMetrics(): Promise<ActionResult<DashboardMetrics>> {
   return executeAction('dashboard.getMetrics', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
 
     const [salesAggregate, paidOrdersCount, unpaidOrdersCount, pendingDeliveriesCount, lowStockProductsCount] =
       await Promise.all([

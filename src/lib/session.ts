@@ -2,6 +2,8 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 
+import type { Role } from '@prisma/client';
+
 import { ForbiddenError, InactiveUserError, UnauthorizedError } from './errors';
 import {
   AUTH_COOKIE_NAME,
@@ -66,6 +68,17 @@ export async function requireSession(): Promise<SessionPayload> {
   }
 
   return { ...session, role: user.role };
+}
+
+/** Exige una sesion valida cuyo rol (leido de la base de datos) este entre los permitidos. */
+export async function requireRole(...allowedRoles: Role[]): Promise<SessionPayload> {
+  const session = await requireSession();
+
+  if (!allowedRoles.includes(session.role)) {
+    throw new ForbiddenError();
+  }
+
+  return session;
 }
 
 export async function requireAdminSession(): Promise<SessionPayload> {

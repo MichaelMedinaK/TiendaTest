@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export default async function UsersPage() {
   const result = await getUsers();
 
-  // Un usuario STAFF autenticado recibe aqui el error de permisos de la Server Action.
+  // Un usuario que no es ADMIN recibe aqui el error de permisos de la Server Action.
   if (!result.success) {
     return <FeedbackMessage tone="error" message={result.error} />;
   }

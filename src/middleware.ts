@@ -1,27 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { AUTH_COOKIE_NAME, verifySessionToken } from '@/lib/jwt';
+import { ROLE_HOME_ROUTE, canAccessRoute } from '@/lib/permissions';
 
 const LOGIN_PATH = '/login';
-const DASHBOARD_PATH = '/admin/dashboard';
 
 /**
  * Guarda de acceso a nivel de borde: evita renderizar cualquier ruta /admin
- * sin una cookie de sesion valida.
+ * sin una cookie de sesion valida o a un rol sin permiso sobre ese modulo.
  */
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith('/admin') && !session) {
-    const loginUrl = new URL(LOGIN_PATH, request.url);
-    loginUrl.searchParams.set('redirectTo', pathname);
-    return NextResponse.redirect(loginUrl);
+  if (pathname.startsWith('/admin')) {
+    if (!session) {
+      const loginUrl = new URL(LOGIN_PATH, request.url);
+      loginUrl.searchParams.set('redirectTo', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    if (!canAccessRoute(session.role, pathname)) {
+      return NextResponse.redirect(new URL(ROLE_HOME_ROUTE[session.role], request.url));
+    }
   }
 
   if (pathname === LOGIN_PATH && session) {
-    return NextResponse.redirect(new URL(DASHBOARD_PATH, request.url));
+    return NextResponse.redirect(new URL(ROLE_HOME_ROUTE[session.role], request.url));
   }
 
   return NextResponse.next();

@@ -7,7 +7,7 @@ import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { InsufficientStockError, OrderNotFoundError, ValidationError } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/lib/session';
+import { requireRole, requireSession } from '@/lib/session';
 import {
   optionalText,
   requireEnumValue,
@@ -19,6 +19,7 @@ const SALES_ROUTE = '/admin/ventas';
 const INVENTORY_ROUTE = '/admin/inventario';
 const DASHBOARD_ROUTE = '/admin/dashboard';
 const REPORT_ROUTE = '/admin/reporte';
+const DELIVERIES_ROUTE = '/admin/entregas';
 
 export interface OrderItemInput {
   productId: string;
@@ -46,7 +47,7 @@ type StockMovement = { productId: string; quantity: number };
 
 export async function getOrders(): Promise<ActionResult<OrderWithItems[]>> {
   return executeAction('orders.getOrders', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
 
     const orders = await prisma.order.findMany({
       include: ORDER_WITH_ITEMS,
@@ -58,13 +59,32 @@ export async function getOrders(): Promise<ActionResult<OrderWithItems[]>> {
   });
 }
 
+/** Domicilios por atender (con direccion y sin entregar). Disponible para todos los roles. */
+export async function getDeliveries(): Promise<ActionResult<OrderWithItems[]>> {
+  return executeAction('orders.getDeliveries', async (trace) => {
+    await requireSession();
+
+    const deliveries = await prisma.order.findMany({
+      where: {
+        address: { not: null },
+        deliveryStatus: { in: [DeliveryStatus.PENDING, DeliveryStatus.IN_TRANSIT] },
+      },
+      include: ORDER_WITH_ITEMS,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    trace.addStep(`domicilios-listados:${deliveries.length}`);
+    return deliveries;
+  });
+}
+
 /**
  * Registra la venta y descuenta el stock dentro de una unica transaccion.
  * El precio unitario se toma del catalogo (nunca del cliente) para evitar manipulacion de totales.
  */
 export async function createOrder(input: OrderInput): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.createOrder', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
 
     const orderData = parseOrderInput(input);
     trace.addStep(`datos-validados:${orderData.items.length}-items`);
@@ -92,7 +112,7 @@ export async function createOrder(input: OrderInput): Promise<ActionResult<Order
  */
 export async function updateOrder(orderId: string, input: OrderInput): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.updateOrder', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
     trace.setBusinessId(orderId);
 
     const orderData = parseOrderInput(input);
@@ -129,7 +149,7 @@ export async function updatePaymentStatus(
   paymentStatus: PaymentStatus,
 ): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.updatePaymentStatus', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
     trace.setBusinessId(orderId);
 
     const newPaymentStatus = requireEnumValue(paymentStatus, PaymentStatus, 'estado del pago');
@@ -175,7 +195,7 @@ export async function updateDeliveryStatus(
 /** Elimina la venta y devuelve sus unidades al inventario. */
 export async function deleteOrder(orderId: string): Promise<ActionResult<void>> {
   return executeAction('orders.deleteOrder', async (trace) => {
-    await requireSession();
+    await requireRole('ADMIN', 'STAFF');
     trace.setBusinessId(orderId);
 
     await prisma.$transaction(async (transaction) => {
@@ -295,4 +315,5 @@ function revalidateSalesViews(): void {
   revalidatePath(INVENTORY_ROUTE);
   revalidatePath(DASHBOARD_ROUTE);
   revalidatePath(REPORT_ROUTE);
+  revalidatePath(DELIVERIES_ROUTE);
 }
