@@ -5,24 +5,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import type { DeliveryStatus, PaymentStatus, Product } from '@prisma/client';
+import type { DeliveryStatus } from '@prisma/client';
 
-import { type OrderWithItems, updateDeliveryStatus, updatePaymentStatus } from '@/actions/orders';
+import { type OrderWithItems, updateDeliveryStatus } from '@/actions/orders';
+import type { InventoryProduct } from '@/actions/products';
 import { OrderItemsList } from '@/components/OrderItemsList';
+import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { CARD_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { NEW_SALE_ANCHOR } from '@/lib/constants';
-import { formatCurrency, formatSchedule, formatScheduleDay, formatShipping } from '@/lib/format';
-import {
-  DELIVERY_METHOD_LABELS,
-  DELIVERY_STATUS_LABELS,
-  PAYMENT_STATUS_LABELS,
-  toSelectOptions,
-} from '@/lib/labels';
+import { formatCurrency, formatSchedule, formatScheduleDay, formatShipping, formatUserLabel } from '@/lib/format';
+import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
 
 import { OrderForm } from '../ventas/OrderForm';
 
-const PAYMENT_STATUS_OPTIONS = toSelectOptions(PAYMENT_STATUS_LABELS);
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 const NO_DATE_KEY = 'sin-fecha';
 
@@ -51,7 +47,15 @@ function groupByScheduledDay(orders: OrderWithItems[]): OrderGroup[] {
 }
 
 /** Lista de ventas con sus estados, ordenadas por fecha programada, con edicion en el mismo lugar. */
-export function SalesBoard({ orders, products }: { orders: OrderWithItems[]; products: Product[] }) {
+export function SalesBoard({
+  orders,
+  products,
+  showSeller = false,
+}: {
+  orders: OrderWithItems[];
+  products: InventoryProduct[];
+  showSeller?: boolean;
+}) {
   const router = useRouter();
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
@@ -88,7 +92,10 @@ export function SalesBoard({ orders, products }: { orders: OrderWithItems[]; pro
               ) : (
               <article key={order.id} className={`${CARD_CLASS} space-y-3`}>
                 <header className="flex items-start justify-between gap-3">
-                  <h3 className="font-semibold text-slate-900">{order.reference}</h3>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">{order.reference}</h3>
+                    {showSeller && <p className="text-xs text-brand-600">Vendedor: {formatUserLabel(order.seller)}</p>}
+                  </div>
                   <p className="shrink-0 text-base font-bold text-slate-900">{formatCurrency(order.total)}</p>
                 </header>
 
@@ -114,16 +121,8 @@ export function SalesBoard({ orders, products }: { orders: OrderWithItems[]; pro
 
                 <OrderItemsList items={order.items} />
 
-                <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
-                  <div>
-                    <p className="mb-1 text-xs font-medium text-slate-500">Pago</p>
-                    <StatusSelect<PaymentStatus>
-                      ariaLabel={`Estado del pago de ${order.reference}`}
-                      value={order.paymentStatus}
-                      options={PAYMENT_STATUS_OPTIONS}
-                      onChangeAction={(nextStatus) => refreshAfter(updatePaymentStatus(order.id, nextStatus))}
-                    />
-                  </div>
+                <div className="space-y-3 border-t border-slate-100 pt-3">
+                  <PaymentsControl order={order} />
                   <div>
                     <p className="mb-1 text-xs font-medium text-slate-500">Envio</p>
                     <StatusSelect<DeliveryStatus>

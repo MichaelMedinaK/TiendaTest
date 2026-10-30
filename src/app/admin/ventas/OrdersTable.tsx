@@ -4,14 +4,15 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-import type { DeliveryStatus, PaymentStatus, Product } from '@prisma/client';
+import type { DeliveryStatus } from '@prisma/client';
 
-import { type OrderWithItems, deleteOrder, updateDeliveryStatus, updatePaymentStatus } from '@/actions/orders';
+import { type OrderWithItems, deleteOrder, updateDeliveryStatus } from '@/actions/orders';
+import type { InventoryProduct } from '@/actions/products';
 import { OrderItemsList } from '@/components/OrderItemsList';
+import { PaymentsPanel, PaymentsSummary } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
 import {
-  BADGE_CLASS,
   CARD_CLASS,
   SECONDARY_BUTTON_CLASS,
   STACKED_CELL_CLASS,
@@ -26,25 +27,27 @@ import {
   STACKED_WRAPPER_CLASS,
   TABLE_HEAD_CELL_CLASS,
 } from '@/components/ui/styles';
-import { formatCurrency, formatDateTime, formatSchedule, formatShipping } from '@/lib/format';
-import {
-  DELIVERY_METHOD_LABELS,
-  DELIVERY_STATUS_LABELS,
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_STATUS_BADGES,
-  PAYMENT_STATUS_LABELS,
-  toSelectOptions,
-} from '@/lib/labels';
+import { formatCurrency, formatDateTime, formatSchedule, formatShipping, formatUserLabel } from '@/lib/format';
+import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
 
 import { OrderForm } from './OrderForm';
 
-const PAYMENT_STATUS_OPTIONS = toSelectOptions(PAYMENT_STATUS_LABELS);
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 const COLUMN_COUNT = 7;
 
-export function OrdersTable({ orders, products }: { orders: OrderWithItems[]; products: Product[] }) {
+export function OrdersTable({
+  orders,
+  products,
+  showSeller = false,
+}: {
+  orders: OrderWithItems[];
+  products: InventoryProduct[];
+  /** Muestra de que inventario salio cada venta (util para el administrador). */
+  showSeller?: boolean;
+}) {
   const router = useRouter();
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [paymentsOrderId, setPaymentsOrderId] = useState<string | null>(null);
 
   // Tras persistir un cambio se refresca el server component para recalcular stock y metricas.
   const refreshAfter = async <TResult,>(action: Promise<TResult>): Promise<TResult> => {
@@ -79,6 +82,9 @@ export function OrdersTable({ orders, products }: { orders: OrderWithItems[]; pr
             <tr className={STACKED_ROW_CLASS}>
               <td data-label="Venta" className={STACKED_TITLE_CELL_CLASS}>
                 <p>{order.reference}</p>
+                {showSeller && (
+                  <p className="text-xs font-normal text-brand-600">Vendedor: {formatUserLabel(order.seller)}</p>
+                )}
                 <p className="text-xs font-normal text-slate-500">
                   {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
                   {order.address ? ` - ${order.address}` : ''}
@@ -91,16 +97,12 @@ export function OrdersTable({ orders, products }: { orders: OrderWithItems[]; pr
                 <OrderItemsList items={order.items} />
               </td>
               <td data-label="Pago" className={STACKED_CELL_CLASS}>
-                <div className="flex flex-col items-end md:items-start">
-                  <p className="mb-1 text-xs text-slate-500">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</p>
-                  <span className={`${BADGE_CLASS} ${PAYMENT_STATUS_BADGES[order.paymentStatus]} mb-1`}>
-                    {PAYMENT_STATUS_LABELS[order.paymentStatus]}
-                  </span>
-                  <StatusSelect<PaymentStatus>
-                    ariaLabel={`Estado del pago de ${order.reference}`}
-                    value={order.paymentStatus}
-                    options={PAYMENT_STATUS_OPTIONS}
-                    onChangeAction={(nextStatus) => refreshAfter(updatePaymentStatus(order.id, nextStatus))}
+                <div className="flex flex-col items-end gap-1 md:items-start">
+                  <p className="text-xs text-slate-500">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</p>
+                  <PaymentsSummary
+                    order={order}
+                    isOpen={paymentsOrderId === order.id}
+                    onToggle={() => setPaymentsOrderId(paymentsOrderId === order.id ? null : order.id)}
                   />
                 </div>
               </td>
@@ -127,6 +129,14 @@ export function OrdersTable({ orders, products }: { orders: OrderWithItems[]; pr
                 </div>
               </td>
             </tr>
+
+            {paymentsOrderId === order.id && (
+              <tr className={STACKED_EDIT_ROW_CLASS}>
+                <td colSpan={COLUMN_COUNT} className={STACKED_EDIT_CELL_CLASS}>
+                  <PaymentsPanel order={order} />
+                </td>
+              </tr>
+            )}
 
             {editingOrderId === order.id && (
               <tr className={STACKED_EDIT_ROW_CLASS}>

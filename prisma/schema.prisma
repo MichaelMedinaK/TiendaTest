@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -11,11 +11,13 @@ datasource db {
 enum Role {
   ADMIN
   STAFF
+  RESELLER
   COURIER
 }
 
 enum PaymentStatus {
   PENDING
+  PARTIAL
   PAID
 }
 
@@ -37,34 +39,87 @@ enum DeliveryMethod {
   PICKUP
 }
 
+enum MovementType {
+  ENTRY
+  EXIT
+  SALE
+  SALE_RETURN
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  password  String
-  role      Role     @default(ADMIN)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  name               String?
+  password           String
+  role               Role                @default(ADMIN)
+  isActive           Boolean             @default(true)
+  // Perfil adicional de domiciliario para tenderos y revendedores (el rol COURIER ya lo es por definicion).
+  isCourier          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  inventoryItems     InventoryItem[]
+  inventoryMovements InventoryMovement[]
+  orders             Order[]
+  paymentsReceived   Payment[]           @relation("PaymentReceivedBy")
+  paymentsVoided     Payment[]           @relation("PaymentVoidedBy")
 
   @@map("users")
 }
 
+// Catalogo general de productos: lo administra el ADMIN y es comun a todos los vendedores.
 model Product {
-  id         String      @id @default(uuid())
-  name       String
-  sku        String?     @unique
-  price      Float
-  stock      Int         @default(0)
-  isActive   Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  orderItems OrderItem[]
+  id             String          @id @default(uuid())
+  name           String
+  sku            String?         @unique
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  inventoryItems InventoryItem[]
+  orderItems     OrderItem[]
 
   @@map("products")
 }
 
+// Inventario de un usuario: su stock, su precio real (costo) y su precio de venta de cada producto del catalogo.
+model InventoryItem {
+  id        String              @id @default(uuid())
+  ownerId   String
+  productId String
+  stock     Int                 @default(0)
+  costPrice Float               @default(0)
+  price     Float
+  createdAt DateTime            @default(now())
+  owner     User                @relation(fields: [ownerId], references: [id])
+  product   Product             @relation(fields: [productId], references: [id])
+  movements InventoryMovement[]
+
+  @@unique([ownerId, productId])
+  @@index([productId])
+  @@map("inventory_items")
+}
+
+// Historial de stock: cada cambio queda con su motivo, responsable y el stock resultante.
+model InventoryMovement {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  type            MovementType
+  // Con signo: positivo suma al stock, negativo resta.
+  quantity        Int
+  stockAfter      Int
+  reason          String
+  userId          String
+  // Venta que origino el movimiento (sin relacion para conservar el historial si la venta se elimina).
+  orderId         String?
+  createdAt       DateTime      @default(now())
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([inventoryItemId, createdAt])
+  @@map("inventory_movements")
+}
+
 model Order {
   id             String         @id @default(uuid())
+  sellerId       String
   reference      String
   deliveryMethod DeliveryMethod @default(PICKUP)
   address        String?
@@ -74,22 +129,49 @@ model Order {
   distanceKm     Float?
   shippingPrice  Float          @default(0)
   paymentMethod  PaymentMethod  @default(CASH)
+  // Se calcula con los cobros no anulados: Pendiente (nada), Parcial (menos que el total) o Pagado.
   paymentStatus  PaymentStatus  @default(PENDING)
   deliveryStatus DeliveryStatus @default(PENDING)
   total          Float
   createdAt      DateTime       @default(now())
+  seller         User           @relation(fields: [sellerId], references: [id])
   items          OrderItem[]
+  payments       Payment[]
 
   @@index([createdAt])
+  @@index([sellerId])
   @@map("orders")
 }
 
+// Cobro de una venta: una venta puede cobrarse en varios pagos, cada uno con su metodo y quien lo recibio.
+// Un cobro no se borra: se anula con motivo y deja de contar para el saldo.
+model Payment {
+  id           String        @id @default(uuid())
+  orderId      String
+  amount       Float
+  method       PaymentMethod
+  receivedById String
+  note         String?
+  createdAt    DateTime      @default(now())
+  voidedAt     DateTime?
+  voidReason   String?
+  voidedById   String?
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  receivedBy   User          @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+  voidedBy     User?         @relation("PaymentVoidedBy", fields: [voidedById], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
 model OrderItem {
-  id        String  @id @default(uuid())
+  id        String @id @default(uuid())
   orderId   String
   productId String
   quantity  Int
   unitPrice Float
+  // Costo del producto al momento de la venta, para que el informe de ganancia no cambie si luego varia el costo.
+  unitCost  Float  @default(0)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])

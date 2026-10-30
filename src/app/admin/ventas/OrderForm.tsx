@@ -1,12 +1,14 @@
 'use client';
 
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Route, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useMemo, useState, useTransition } from 'react';
+import { FormEvent, useMemo, useRef, useState, useTransition } from 'react';
 
-import type { DeliveryMethod, DeliveryStatus, PaymentMethod, PaymentStatus, Product } from '@prisma/client';
+import type { DeliveryMethod, DeliveryStatus, PaymentMethod } from '@prisma/client';
 
+import { quoteDelivery } from '@/actions/delivery-quote';
 import { type OrderWithItems, createOrder, updateOrder } from '@/actions/orders';
+import type { InventoryOwner, InventoryProduct } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
 import {
@@ -18,12 +20,11 @@ import {
 } from '@/components/ui/styles';
 import { DELIVERY_RATE_PER_KM } from '@/lib/constants';
 import { calculateShippingPrice } from '@/lib/shipping';
-import { formatCurrency, formatProductLabel } from '@/lib/format';
+import { formatCurrency, formatProductLabel, formatUserLabel } from '@/lib/format';
 import {
   DELIVERY_METHOD_LABELS,
   DELIVERY_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
-  PAYMENT_STATUS_LABELS,
   toSelectOptions,
 } from '@/lib/labels';
 
@@ -35,28 +36,38 @@ interface OrderLine {
 }
 
 interface OrderFormProps {
-  products: Product[];
+  /** Productos de todos los inventarios a los que tiene acceso el usuario; se filtran por vendedor. */
+  products: InventoryProduct[];
   /** Si se recibe, el formulario edita esa venta; si no, registra una nueva. */
   order?: OrderWithItems;
+  /** Al registrar: usuarios desde cuyo inventario se puede vender (el selector aparece si hay mas de uno). */
+  sellers?: InventoryOwner[];
+  /** Al registrar: vendedor inicial (el usuario en sesion). */
+  currentUserId?: string;
   onFinished?: () => void;
 }
 
 const DELIVERY_METHOD_OPTIONS = toSelectOptions(DELIVERY_METHOD_LABELS);
 const DEFAULT_DELIVERY_METHOD: DeliveryMethod = 'PICKUP';
 const PAYMENT_METHOD_OPTIONS = toSelectOptions(PAYMENT_METHOD_LABELS);
-const PAYMENT_STATUS_OPTIONS = toSelectOptions(PAYMENT_STATUS_LABELS);
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 
-const createEmptyLine = (products: Product[]): OrderLine => ({
+const createEmptyLine = (products: InventoryProduct[]): OrderLine => ({
   productId: products[0]?.id ?? '',
   quantity: 1,
   unitPrice: String(products[0]?.price ?? ''),
 });
 
-export function OrderForm({ products, order, onFinished }: OrderFormProps) {
+export function OrderForm({ products, order, sellers = [], currentUserId, onFinished }: OrderFormProps) {
   const router = useRouter();
   const toast = useFeedback();
   const isEditing = Boolean(order);
+  // La venta usa solo el inventario de su vendedor; al editar el vendedor no cambia.
+  const [sellerId, setSellerId] = useState(order?.sellerId ?? currentUserId ?? '');
+  const sellerProducts = useMemo(
+    () => (sellerId ? products.filter((product) => product.ownerId === sellerId) : products),
+    [products, sellerId],
+  );
   const [lines, setLines] = useState<OrderLine[]>(
     order
       ? order.items.map((item) => ({
@@ -64,20 +75,25 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
           quantity: item.quantity,
           unitPrice: String(item.unitPrice),
         }))
-      : [createEmptyLine(products)],
+      : [createEmptyLine(sellerProducts)],
   );
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(order?.deliveryMethod ?? DEFAULT_DELIVERY_METHOD);
   const [distanceKm, setDistanceKm] = useState<string>(order?.distanceKm != null ? String(order.distanceKm) : '');
   const [isPaid, setIsPaid] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isQuoting, startQuoting] = useTransition();
+  const addressRef = useRef<HTMLInputElement>(null);
   const isDelivery = deliveryMethod === 'DELIVERY';
 
-  const productsById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const productsById = useMemo(() => new Map(sellerProducts.map((product) => [product.id, product])), [sellerProducts]);
 
-  // Al editar, las unidades que la venta ya tiene reservadas vuelven a estar disponibles para ella.
+  // Al editar, las unidades que la venta ya tiene reservadas vuelven a estar disponibles para ella (una cancelada no reserva).
   const reservedByProduct = useMemo(
-    () => new Map(order?.items.map((item) => [item.productId, item.quantity]) ?? []),
+    () =>
+      new Map(
+        order && order.deliveryStatus !== 'CANCELLED' ? order.items.map((item) => [item.productId, item.quantity]) : [],
+      ),
     [order],
   );
 
@@ -86,7 +102,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
     () => new Map(order?.items.map((item) => [item.productId, item.unitPrice]) ?? []),
     [order],
   );
-  const defaultPriceOf = (product: Product) => agreedPriceByProduct.get(product.id) ?? product.price;
+  const defaultPriceOf = (product: InventoryProduct) => agreedPriceByProduct.get(product.id) ?? product.price;
 
   const itemsTotal = lines.reduce((accumulated, line) => accumulated + (Number(line.unitPrice) || 0) * line.quantity, 0);
   // Mismo calculo que el servidor (km x tarifa); el servidor es quien fija el valor definitivo.
@@ -103,6 +119,20 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
     setLines((currentLines) => currentLines.filter((_, lineIndex) => lineIndex !== index));
   };
 
+  const handleQuoteDistance = () => {
+    startQuoting(async () => {
+      const result = await quoteDelivery(addressRef.current?.value ?? '');
+
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      setDistanceKm(String(result.data.distanceKm));
+      toast.success(`${result.data.distanceKm} km hasta ${result.data.destination}`);
+    });
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -111,6 +141,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
 
     const input = {
       reference: String(formData.get('reference') ?? ''),
+      sellerId: isEditing ? undefined : sellerId,
       deliveryMethod,
       address: String(formData.get('address') ?? ''),
       scheduledDate: String(formData.get('scheduledDate') ?? ''),
@@ -118,8 +149,9 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
       scheduledTo: String(formData.get('scheduledTo') ?? ''),
       distanceKm,
       paymentMethod: formData.get('paymentMethod') as PaymentMethod,
-      // Al crear solo se indica si ya se pago; el envio siempre parte como pendiente.
-      paymentStatus: isEditing ? (formData.get('paymentStatus') as PaymentStatus) : isPaid ? 'PAID' : 'PENDING',
+      // Al crear solo se indica si ya se cobro todo (se registra el cobro por el total); los cobros parciales se
+      // registran despues desde Cobros. El envio siempre parte como nuevo.
+      isPaid: isEditing ? undefined : isPaid,
       deliveryStatus: isEditing ? (formData.get('deliveryStatus') as DeliveryStatus) : 'PENDING',
       items: lines
         .filter((line) => line.productId)
@@ -139,7 +171,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
         setDeliveryMethod(DEFAULT_DELIVERY_METHOD);
         setDistanceKm('');
         setIsPaid(false);
-        setLines([createEmptyLine(products)]);
+        setLines([createEmptyLine(sellerProducts)]);
         toast.success(`Venta registrada por ${formatCurrency(result.data.total)}`);
       } else {
         toast.success('Venta actualizada');
@@ -163,6 +195,29 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
       <h2 className="text-lg font-semibold text-slate-900">{isEditing ? 'Editar venta' : 'Registrar nueva venta'}</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        {!isEditing && sellers.length > 1 && (
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLASS} htmlFor="sellerId">
+              Vender desde el inventario de
+            </label>
+            <select
+              id="sellerId"
+              className={INPUT_CLASS}
+              value={sellerId}
+              onChange={(event) => {
+                setSellerId(event.target.value);
+                setLines([createEmptyLine(products.filter((product) => product.ownerId === event.target.value))]);
+              }}
+            >
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {formatUserLabel(seller)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="sm:col-span-2">
           <label className={LABEL_CLASS} htmlFor="reference">
             Referencia
@@ -204,6 +259,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
           <input
             id="address"
             name="address"
+            ref={addressRef}
             required={isDelivery}
             disabled={!isDelivery}
             maxLength={500}
@@ -230,6 +286,17 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
             className={INPUT_CLASS}
             placeholder={isDelivery ? 'Ej. 12.5' : 'No aplica para recogida'}
           />
+          {isDelivery && (
+            <button
+              type="button"
+              className={`${SECONDARY_BUTTON_CLASS} mt-2`}
+              disabled={isQuoting}
+              onClick={handleQuoteDistance}
+            >
+              <Route className="h-4 w-4" />
+              {isQuoting ? 'Calculando...' : 'Calcular km desde la direccion'}
+            </button>
+          )}
         </div>
 
         <div>
@@ -247,7 +314,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
           />
           {isDelivery && (
             <p className="mt-1 text-xs text-slate-500">
-              {distanceKm || 0} km x {formatCurrency(DELIVERY_RATE_PER_KM)} por km, redondeado a miles
+              {distanceKm || 0} km x {formatCurrency(DELIVERY_RATE_PER_KM)} por km, redondeado hacia arriba
             </p>
           )}
         </div>
@@ -311,43 +378,24 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
         </div>
 
         {isEditing ? (
-          <>
-            <div>
-              <label className={LABEL_CLASS} htmlFor="paymentStatus">
-                Estado del pago
-              </label>
-              <select
-                id="paymentStatus"
-                name="paymentStatus"
-                className={INPUT_CLASS}
-                defaultValue={order?.paymentStatus ?? 'PENDING'}
-              >
-                {PAYMENT_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={LABEL_CLASS} htmlFor="deliveryStatus">
-                Estado del envio
-              </label>
-              <select
-                id="deliveryStatus"
-                name="deliveryStatus"
-                className={INPUT_CLASS}
-                defaultValue={order?.deliveryStatus ?? 'PENDING'}
-              >
-                {DELIVERY_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </>
+          <div>
+            <label className={LABEL_CLASS} htmlFor="deliveryStatus">
+              Estado del envio
+            </label>
+            <select
+              id="deliveryStatus"
+              name="deliveryStatus"
+              className={INPUT_CLASS}
+              defaultValue={order?.deliveryStatus ?? 'PENDING'}
+            >
+              {DELIVERY_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">Los cobros se registran desde el boton Cobros de la venta.</p>
+          </div>
         ) : (
           <div>
             <p className={LABEL_CLASS}>Pago recibido</p>
@@ -377,6 +425,10 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
       <div className="space-y-3">
         <p className={LABEL_CLASS}>Productos del stock</p>
 
+        {sellerProducts.length === 0 && (
+          <FeedbackMessage tone="error" message="Este vendedor no tiene productos en su inventario" />
+        )}
+
         {lines.map((line, index) => {
           const selectedProduct = productsById.get(line.productId);
           const availableStock = selectedProduct
@@ -398,7 +450,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
                   });
                 }}
               >
-                {products.map((product) => (
+                {sellerProducts.map((product) => (
                   <option key={product.id} value={product.id}>
                     {formatProductLabel(product)} ({formatCurrency(product.price)}) - stock{' '}
                     {product.stock + (reservedByProduct.get(product.id) ?? 0)}
@@ -479,7 +531,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
         <button
           type="button"
           className={SECONDARY_BUTTON_CLASS}
-          onClick={() => setLines((currentLines) => [...currentLines, createEmptyLine(products)])}
+          onClick={() => setLines((currentLines) => [...currentLines, createEmptyLine(sellerProducts)])}
         >
           <Plus className="h-4 w-4" />
           Agregar producto
@@ -498,7 +550,7 @@ export function OrderForm({ products, order, onFinished }: OrderFormProps) {
               Cancelar
             </button>
           )}
-          <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
+          <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending || sellerProducts.length === 0}>
             {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Registrar venta'}
           </button>
         </div>

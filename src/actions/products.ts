@@ -1,17 +1,28 @@
 'use server';
 
-import { DeliveryStatus, PaymentStatus, Prisma, type Product } from '@prisma/client';
+import { DeliveryStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
-import { ProductInUseError, ProductNotFoundError, SkuAlreadyRegisteredError } from '@/lib/errors';
+import {
+  InsufficientStockError,
+  InventoryItemNotFoundError,
+  ProductAlreadyInInventoryError,
+  ProductNotFoundError,
+} from '@/lib/errors';
+import { applyStockChange } from '@/lib/inventory-movements';
+import { assertOwnsInventory, resolveActingOwnerId, resolveOwnerFilter } from '@/lib/inventory-scope';
+import { INVENTORY_ROLES } from '@/lib/permissions';
+import { refreshPaymentStatus } from '@/lib/payments';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/session';
 import {
-  optionalText,
+  optionalNonNegativeNumber,
+  requireEnumValue,
   requireNonNegativeInteger,
+  requirePositiveInteger,
   requirePositiveNumber,
   requireText,
 } from '@/lib/validation';
@@ -19,122 +30,241 @@ import {
 const INVENTORY_ROUTE = '/admin/inventario';
 const SALES_ROUTE = '/admin/ventas';
 // El nombre del producto aparece tambien en el inicio, las entregas y el reporte.
-const PRODUCT_VIEWS = [INVENTORY_ROUTE, SALES_ROUTE, '/admin/dashboard', '/admin/entregas', '/admin/reporte'];
+const INVENTORY_VIEWS = [INVENTORY_ROUTE, SALES_ROUTE, '/admin/dashboard', '/admin/entregas', '/admin/reporte'];
 
-export interface CreateProductInput {
+/** Producto del catalogo tal como esta en un inventario: `id` es el del catalogo (el que se vende). */
+export interface InventoryProduct {
+  id: string;
+  inventoryItemId: string;
+  ownerId: string;
   name: string;
+  sku: string | null;
+  costPrice: number;
   price: number;
   stock: number;
-  sku?: string;
 }
 
-export interface UpdateProductDetailsInput {
+export interface InventoryOwner {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+export interface CatalogOption {
+  id: string;
   name: string;
-  sku?: string;
+  sku: string | null;
+}
+
+export interface AddToInventoryInput {
+  productId: string;
+  /** Solo el administrador: agrega el producto al inventario de ese usuario. */
+  ownerId?: string;
+  /** Precio real (lo que cuesta el producto). */
+  costPrice: number;
+  /** Precio de venta. */
+  price: number;
+  /** Stock inicial; si es mayor que cero se registra como una entrada con su motivo. */
+  quantity: number;
+  reason?: string;
+}
+
+export interface UpdatePricesInput {
+  costPrice: number;
   price: number;
 }
 
-/** El SKU es unico: un duplicado se informa con un mensaje claro en lugar de un error tecnico. */
-function rethrowDuplicatedSku(error: unknown, sku: string | null): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002' && sku) {
-    throw new SkuAlreadyRegisteredError(sku);
-  }
-
-  throw error;
+export interface MovementInput {
+  type: 'ENTRY' | 'EXIT';
+  quantity: number;
+  reason: string;
 }
 
-function revalidateProductViews(): void {
-  for (const route of PRODUCT_VIEWS) {
+export interface MovementView {
+  id: string;
+  type: 'ENTRY' | 'EXIT' | 'SALE' | 'SALE_RETURN';
+  quantity: number;
+  stockAfter: number;
+  reason: string;
+  userName: string;
+  createdAt: Date;
+}
+
+const ITEM_WITH_PRODUCT = { product: { select: { id: true, name: true, sku: true } } } satisfies Prisma.InventoryItemInclude;
+type ItemWithProduct = Prisma.InventoryItemGetPayload<{ include: typeof ITEM_WITH_PRODUCT }>;
+
+function toInventoryProduct(item: ItemWithProduct): InventoryProduct {
+  return {
+    id: item.productId,
+    inventoryItemId: item.id,
+    ownerId: item.ownerId,
+    name: item.product.name,
+    sku: item.product.sku,
+    costPrice: item.costPrice,
+    price: item.price,
+    stock: item.stock,
+  };
+}
+
+function revalidateInventoryViews(): void {
+  for (const route of INVENTORY_VIEWS) {
     revalidatePath(route);
   }
 }
 
-export async function getProducts(): Promise<ActionResult<Product[]>> {
+/**
+ * Productos de un inventario. Sin parametro: el propio. El administrador puede pedir el de otro usuario
+ * (por su id) o `ALL` para ver todos; los demas roles siempre reciben solo el suyo.
+ */
+export async function getProducts(owner?: string): Promise<ActionResult<InventoryProduct[]>> {
   return executeAction('products.getProducts', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+    const session = await requireRole(...INVENTORY_ROLES);
 
-    const products = await prisma.product.findMany({ orderBy: { name: 'asc' } });
-    trace.addStep(`productos-listados:${products.length}`);
+    const items = await prisma.inventoryItem.findMany({
+      where: resolveOwnerFilter(session, owner, false),
+      include: ITEM_WITH_PRODUCT,
+      orderBy: { product: { name: 'asc' } },
+    });
+    trace.addStep(`productos-listados:${items.length}`);
 
-    return products;
+    return items.map(toInventoryProduct);
   });
 }
 
-export async function createProduct(input: CreateProductInput): Promise<ActionResult<Product>> {
-  return executeAction('products.createProduct', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+/** Usuarios con inventario propio: el administrador ve a todos los activos; los demas, solo a si mismos. */
+export async function getInventoryOwners(): Promise<ActionResult<InventoryOwner[]>> {
+  return executeAction('products.getInventoryOwners', async () => {
+    const session = await requireRole(...INVENTORY_ROLES);
 
-    const name = requireText(input.name, 'nombre');
-    const price = requirePositiveNumber(input.price, 'precio');
-    const stock = requireNonNegativeInteger(input.stock, 'stock');
-    const sku = optionalText(input.sku, 50);
-    trace.addStep('datos-validados');
-
-    const createdProduct = await prisma.product
-      .create({ data: { name, price, stock, sku } })
-      .catch((error) => rethrowDuplicatedSku(error, sku));
-    trace.setBusinessId(createdProduct.id);
-    trace.addStep('producto-creado');
-
-    revalidateProductViews();
-
-    return createdProduct;
+    return prisma.user.findMany({
+      where:
+        session.role === 'ADMIN'
+          ? { isActive: true, role: { in: INVENTORY_ROLES } }
+          : { id: session.userId },
+      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, name: true, email: true },
+    });
   });
 }
 
-/** Producto actualizado, con la cantidad de ventas pendientes que se recalcularon por el cambio de precio. */
-export type UpdatedProduct = Product & { updatedOrdersCount: number };
+/** Productos del catalogo que todavia no estan en el inventario indicado (el propio si no se indica otro). */
+export async function getAvailableCatalog(owner?: string): Promise<ActionResult<CatalogOption[]>> {
+  return executeAction('products.getAvailableCatalog', async () => {
+    const session = await requireRole(...INVENTORY_ROLES);
+    const ownerId = await resolveActingOwnerId(session, owner);
+
+    return prisma.product.findMany({
+      where: { isActive: true, inventoryItems: { none: { ownerId } } },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, sku: true },
+    });
+  });
+}
+
+/** Agrega un producto del catalogo al inventario con su costo, precio de venta y stock inicial. */
+export async function addToInventory(input: AddToInventoryInput): Promise<ActionResult<InventoryProduct>> {
+  return executeAction('products.addToInventory', async (trace) => {
+    const session = await requireRole(...INVENTORY_ROLES);
+
+    const productId = requireText(input.productId, 'producto');
+    const price = requirePositiveNumber(input.price, 'precio de venta');
+    const costPrice = optionalNonNegativeNumber(input.costPrice, 'precio real') ?? 0;
+    const quantity = requireNonNegativeInteger(input.quantity, 'cantidad');
+    const reason = quantity > 0 ? requireText(input.reason, 'descripcion', 500) : null;
+    const ownerId = await resolveActingOwnerId(session, input.ownerId);
+    trace.setBusinessId(productId);
+
+    const createdItem = await prisma.$transaction(async (transaction) => {
+      const product = await transaction.product.findUnique({ where: { id: productId } });
+
+      if (!product || !product.isActive) {
+        throw new ProductNotFoundError(productId);
+      }
+
+      const item = await transaction.inventoryItem
+        .create({ data: { ownerId, productId, price, costPrice }, include: ITEM_WITH_PRODUCT })
+        .catch((error) => {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw new ProductAlreadyInInventoryError(product.name);
+          }
+
+          throw error;
+        });
+
+      if (!reason) {
+        return item;
+      }
+
+      const stock = await applyStockChange(transaction, {
+        inventoryItemId: item.id,
+        delta: quantity,
+        type: 'ENTRY',
+        reason,
+        userId: session.userId,
+      });
+
+      return { ...item, stock: stock ?? item.stock };
+    });
+
+    trace.addStep(`agregado-al-inventario:stock=${createdItem.stock}`);
+    revalidateInventoryViews();
+
+    return toInventoryProduct(createdItem);
+  });
+}
 
 /** Ventas "actuales": falta enviarlas o cobrarlas. Las ya cerradas (entregadas y pagadas, o devueltas) no se tocan. */
 const OPEN_ORDER_FILTER = {
   OR: [
     { deliveryStatus: { in: OPEN_DELIVERY_STATUSES } },
-    { deliveryStatus: DeliveryStatus.DELIVERED, paymentStatus: PaymentStatus.PENDING },
+    { deliveryStatus: DeliveryStatus.DELIVERED, paymentStatus: { not: PaymentStatus.PAID } },
   ],
 } satisfies Prisma.OrderWhereInput;
 
-/**
- * Edita nombre, SKU y precio. Si cambia el precio, las ventas pendientes que incluyan el producto con el
- * precio anterior pasan al nuevo y se recalcula su total. Las ventas cerradas y los precios puestos a mano
- * en una venta no se modifican.
- */
-export async function updateProductDetails(
-  productId: string,
-  input: UpdateProductDetailsInput,
-): Promise<ActionResult<UpdatedProduct>> {
-  return executeAction('products.updateDetails', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
-    trace.setBusinessId(productId);
+/** Producto actualizado, con la cantidad de ventas pendientes que se recalcularon por el cambio de precio. */
+export type UpdatedInventoryProduct = InventoryProduct & { updatedOrdersCount: number };
 
-    const name = requireText(input.name, 'nombre');
-    const sku = optionalText(input.sku, 50);
-    const price = requirePositiveNumber(input.price, 'precio');
+/**
+ * Edita el precio real y el precio de venta. Si cambia el precio de venta, las ventas pendientes de ese vendedor
+ * que incluyan el producto con el precio anterior pasan al nuevo y se recalcula su total. Las ventas cerradas, los
+ * costos ya registrados y los precios puestos a mano en una venta no se modifican.
+ */
+export async function updateInventoryPrices(
+  inventoryItemId: string,
+  input: UpdatePricesInput,
+): Promise<ActionResult<UpdatedInventoryProduct>> {
+  return executeAction('products.updatePrices', async (trace) => {
+    const session = await requireRole(...INVENTORY_ROLES);
+    trace.setBusinessId(inventoryItemId);
+
+    const price = requirePositiveNumber(input.price, 'precio de venta');
+    const costPrice = optionalNonNegativeNumber(input.costPrice, 'precio real') ?? 0;
 
     const result = await prisma.$transaction(async (transaction) => {
-      const currentProduct = await transaction.product.findUnique({
-        where: { id: productId },
-        select: { price: true },
-      });
+      const currentItem = await transaction.inventoryItem.findUnique({ where: { id: inventoryItemId } });
 
-      if (!currentProduct) {
-        throw new ProductNotFoundError(productId);
+      if (!currentItem) {
+        throw new InventoryItemNotFoundError(inventoryItemId);
       }
 
-      const updatedProduct = await transaction.product
-        .update({ where: { id: productId }, data: { name, sku, price } })
-        .catch((error) => rethrowDuplicatedSku(error, sku));
+      assertOwnsInventory(session, currentItem.ownerId);
+
+      const updatedItem = await transaction.inventoryItem.update({
+        where: { id: inventoryItemId },
+        data: { price, costPrice },
+        include: ITEM_WITH_PRODUCT,
+      });
 
       const updatedOrdersCount =
-        updatedProduct.price === currentProduct.price
+        updatedItem.price === currentItem.price
           ? 0
-          : await repriceOpenOrders(transaction, productId, currentProduct.price, updatedProduct.price);
+          : await repriceOpenOrders(transaction, currentItem.ownerId, currentItem.productId, currentItem.price, price);
 
-      return { ...updatedProduct, updatedOrdersCount };
+      return { ...toInventoryProduct(updatedItem), updatedOrdersCount };
     });
 
-    trace.addStep(`producto-actualizado:ventas-recalculadas=${result.updatedOrdersCount}`);
-
-    revalidateProductViews();
+    trace.addStep(`precios-actualizados:ventas-recalculadas=${result.updatedOrdersCount}`);
+    revalidateInventoryViews();
 
     return result;
   });
@@ -142,11 +272,16 @@ export async function updateProductDetails(
 
 async function repriceOpenOrders(
   transaction: Prisma.TransactionClient,
+  sellerId: string,
   productId: string,
   previousPrice: number,
   newPrice: number,
 ): Promise<number> {
-  const itemsToReprice = { productId, unitPrice: previousPrice, order: OPEN_ORDER_FILTER } satisfies Prisma.OrderItemWhereInput;
+  const itemsToReprice = {
+    productId,
+    unitPrice: previousPrice,
+    order: { AND: [OPEN_ORDER_FILTER, { sellerId }] },
+  } satisfies Prisma.OrderItemWhereInput;
 
   const affectedItems = await transaction.orderItem.findMany({ where: itemsToReprice, select: { orderId: true } });
   const orderIds = [...new Set(affectedItems.map((item) => item.orderId))];
@@ -168,54 +303,90 @@ async function repriceOpenOrders(
       where: { id: orderId },
       data: { total: Math.round((itemsTotal + order.shippingPrice) * 100) / 100 },
     });
+    await refreshPaymentStatus(transaction, orderId);
   }
 
   return orderIds.length;
 }
 
-/** Elimina un producto que nunca se vendio; si ya figura en ventas se bloquea para no romper el historial. */
-export async function deleteProduct(productId: string): Promise<ActionResult<void>> {
-  return executeAction('products.deleteProduct', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
-    trace.setBusinessId(productId);
+/** Entrada o salida manual de stock. La descripcion es obligatoria y queda en el historial. */
+export async function registerMovement(
+  inventoryItemId: string,
+  input: MovementInput,
+): Promise<ActionResult<InventoryProduct>> {
+  return executeAction('products.registerMovement', async (trace) => {
+    const session = await requireRole(...INVENTORY_ROLES);
+    trace.setBusinessId(inventoryItemId);
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { id: productId },
-      select: { name: true, _count: { select: { orderItems: true } } },
+    const type = requireEnumValue(input.type, { ENTRY: 'ENTRY', EXIT: 'EXIT' } as const, 'tipo de movimiento');
+    const quantity = requirePositiveInteger(input.quantity, 'cantidad');
+    const reason = requireText(input.reason, 'descripcion', 500);
+
+    const updatedItem = await prisma.$transaction(async (transaction) => {
+      const item = await transaction.inventoryItem.findUnique({
+        where: { id: inventoryItemId },
+        include: ITEM_WITH_PRODUCT,
+      });
+
+      if (!item) {
+        throw new InventoryItemNotFoundError(inventoryItemId);
+      }
+
+      assertOwnsInventory(session, item.ownerId);
+
+      const stock = await applyStockChange(transaction, {
+        inventoryItemId,
+        delta: type === 'EXIT' ? -quantity : quantity,
+        type,
+        reason,
+        userId: session.userId,
+      });
+
+      if (stock === null) {
+        throw new InsufficientStockError(item.product.name, item.stock);
+      }
+
+      return { ...item, stock };
     });
 
-    if (!existingProduct) {
-      throw new ProductNotFoundError(productId);
-    }
+    trace.addStep(`movimiento:${type}:${quantity}`);
+    revalidateInventoryViews();
 
-    if (existingProduct._count.orderItems > 0) {
-      throw new ProductInUseError(existingProduct.name, existingProduct._count.orderItems);
-    }
-
-    await prisma.product.delete({ where: { id: productId } });
-    trace.addStep('producto-eliminado');
-
-    revalidateProductViews();
+    return toInventoryProduct(updatedItem);
   });
 }
 
-export async function updateStock(productId: string, newStock: number): Promise<ActionResult<Product>> {
-  return executeAction('products.updateStock', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
-    trace.setBusinessId(productId);
+/** Ultimos movimientos de stock de un producto del inventario, del mas reciente al mas antiguo. */
+export async function getMovements(inventoryItemId: string): Promise<ActionResult<MovementView[]>> {
+  return executeAction('products.getMovements', async () => {
+    const session = await requireRole(...INVENTORY_ROLES);
 
-    const stock = requireNonNegativeInteger(newStock, 'stock');
-    const existingProduct = await prisma.product.findUnique({ where: { id: productId } });
+    const item = await prisma.inventoryItem.findUnique({
+      where: { id: inventoryItemId },
+      select: { ownerId: true },
+    });
 
-    if (!existingProduct) {
-      throw new ProductNotFoundError(productId);
+    if (!item) {
+      throw new InventoryItemNotFoundError(inventoryItemId);
     }
 
-    const updatedProduct = await prisma.product.update({ where: { id: productId }, data: { stock } });
-    trace.addStep(`stock-actualizado:${existingProduct.stock}->${stock}`);
+    assertOwnsInventory(session, item.ownerId);
 
-    revalidateProductViews();
+    const movements = await prisma.inventoryMovement.findMany({
+      where: { inventoryItemId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { user: { select: { name: true, email: true } } },
+    });
 
-    return updatedProduct;
+    return movements.map((movement) => ({
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      stockAfter: movement.stockAfter,
+      reason: movement.reason,
+      userName: movement.user.name ?? movement.user.email,
+      createdAt: movement.createdAt,
+    }));
   });
 }

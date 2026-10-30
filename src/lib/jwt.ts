@@ -10,6 +10,8 @@ export interface SessionPayload {
   email: string;
   name: string | null;
   role: Role;
+  /** Solo en sesiones verificadas contra la base de datos (requireSession); el token no lo trae. */
+  isCourier?: boolean;
 }
 
 const JWT_ALGORITHM = 'HS256';

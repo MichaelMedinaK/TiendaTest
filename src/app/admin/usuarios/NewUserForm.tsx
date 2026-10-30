@@ -7,14 +7,24 @@ import { FormEvent, useState, useTransition } from 'react';
 import type { Role } from '@prisma/client';
 
 import { createUser } from '@/actions/users';
+import { FormPanel } from '@/components/FormPanel';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
+import { NEW_USER_ANCHOR } from '@/lib/constants';
 import { ROLE_LABELS, toSelectOptions } from '@/lib/labels';
 
 const ROLE_OPTIONS = toSelectOptions(ROLE_LABELS);
 
 export function NewUserForm() {
+  return (
+    <FormPanel anchorId={NEW_USER_ANCHOR} label="Nuevo usuario">
+      {(close) => <UserForm onDone={close} />}
+    </FormPanel>
+  );
+}
+
+function UserForm({ onDone }: { onDone: () => void }) {
   const router = useRouter();
   const toast = useFeedback();
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
@@ -32,6 +42,7 @@ export function NewUserForm() {
         email: String(formData.get('email') ?? ''),
         password: String(formData.get('password') ?? ''),
         role: formData.get('role') as Role,
+        isCourier: formData.get('isCourier') === 'on',
       });
 
       if (!result.success) {
@@ -42,6 +53,7 @@ export function NewUserForm() {
       form.reset();
       toast.success(`Usuario ${result.data.email} creado`);
       router.refresh();
+      onDone();
     });
   };
 
@@ -92,6 +104,16 @@ export function NewUserForm() {
             ))}
           </select>
         </div>
+
+        <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
+          <input type="checkbox" name="isCourier" className="mt-0.5 h-4 w-4" />
+          <span>
+            Tambien es domiciliario
+            <span className="block text-xs text-slate-500">
+              Solo para tenderos y revendedores: ademas de su inventario, atiende todos los pedidos en Entregas.
+            </span>
+          </span>
+        </label>
       </div>
 
       {feedback && <FeedbackMessage tone={feedback.tone} message={feedback.message} />}

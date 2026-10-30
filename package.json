@@ -11,6 +11,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:rls": "prisma db execute --file prisma/enable-rls.sql --schema prisma/schema.prisma",
+    "db:inventory-model": "prisma db execute --file prisma/prepare-inventory-model.sql --schema prisma/schema.prisma",
+    "db:post-push": "prisma db execute --file prisma/post-push.sql --schema prisma/schema.prisma",
     "db:copy-products": "tsx prisma/copy-products.ts",
     "postinstall": "prisma generate"
   },

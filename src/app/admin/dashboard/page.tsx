@@ -5,6 +5,7 @@ import { type OrderWithItems, getOrders } from '@/actions/orders';
 import { getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
+import { getCurrentSession } from '@/lib/session';
 
 import { SalesBoard } from './SalesBoard';
 
@@ -17,7 +18,7 @@ const ALL_VIEW = 'todas';
 function isCurrentOrder(order: OrderWithItems): boolean {
   const isOpenDelivery = OPEN_DELIVERY_STATUSES.includes(order.deliveryStatus);
   const isDeliveredUnpaid =
-    order.deliveryStatus === DeliveryStatus.DELIVERED && order.paymentStatus === PaymentStatus.PENDING;
+    order.deliveryStatus === DeliveryStatus.DELIVERED && order.paymentStatus !== PaymentStatus.PAID;
 
   return isOpenDelivery || isDeliveredUnpaid;
 }
@@ -38,7 +39,11 @@ function compareBySchedule(first: OrderWithItems, second: OrderWithItems): numbe
 
 export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ ver?: string }> }) {
   const { ver } = (await searchParams) ?? {};
-  const [ordersResult, productsResult] = await Promise.all([getOrders(), getProducts()]);
+  const [ordersResult, productsResult, session] = await Promise.all([
+    getOrders(),
+    getProducts('ALL'),
+    getCurrentSession(),
+  ]);
 
   if (!ordersResult.success) {
     return <FeedbackMessage tone="error" message={ordersResult.error} />;
@@ -67,7 +72,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         </nav>
       </header>
 
-      <SalesBoard orders={orders} products={productsResult.data} />
+      <SalesBoard orders={orders} products={productsResult.data} showSeller={session?.role === 'ADMIN'} />
     </section>
   );
 }

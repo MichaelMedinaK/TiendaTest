@@ -1,19 +1,33 @@
-import { getOrders } from '@/actions/orders';
-import { getProducts } from '@/actions/products';
-import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
-import { NEW_SALE_ANCHOR } from '@/lib/constants';
+import { redirect } from 'next/navigation';
 
-import { OrderForm } from './OrderForm';
+import { getOrders } from '@/actions/orders';
+import { getInventoryOwners, getProducts } from '@/actions/products';
+import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { LOGIN_ROUTE } from '@/lib/constants';
+import { getCurrentSession } from '@/lib/session';
+
+import { NewSalePanel } from './NewSalePanel';
 import { OrdersTable } from './OrdersTable';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SalesPage() {
-  const [productsResult, ordersResult] = await Promise.all([getProducts(), getOrders()]);
+  const session = await getCurrentSession();
 
-  if (!productsResult.success || !ordersResult.success) {
-    const errorMessage = !productsResult.success ? productsResult.error : (ordersResult as { error: string }).error;
-    return <FeedbackMessage tone="error" message={errorMessage} />;
+  if (!session) {
+    redirect(LOGIN_ROUTE);
+  }
+
+  // 'ALL': el administrador vende desde cualquier inventario; un tendero recibe solo el suyo.
+  const [productsResult, ordersResult, ownersResult] = await Promise.all([
+    getProducts('ALL'),
+    getOrders(),
+    getInventoryOwners(),
+  ]);
+
+  if (!productsResult.success || !ordersResult.success || !ownersResult.success) {
+    const failure = [productsResult, ordersResult, ownersResult].find((result) => !result.success);
+    return <FeedbackMessage tone="error" message={(failure as { error: string }).error} />;
   }
 
   return (
@@ -23,13 +37,15 @@ export default async function SalesPage() {
         <p className="text-sm text-slate-500">Registra, edita y elimina ventas del stock disponible</p>
       </header>
 
-      <div id={NEW_SALE_ANCHOR} className="scroll-mt-36 md:scroll-mt-6">
-        <OrderForm products={productsResult.data} />
-      </div>
+      <NewSalePanel products={productsResult.data} sellers={ownersResult.data} currentUserId={session.userId} />
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">Historial de ventas</h2>
-        <OrdersTable orders={ordersResult.data} products={productsResult.data} />
+        <OrdersTable
+          orders={ordersResult.data}
+          products={productsResult.data}
+          showSeller={session.role === 'ADMIN'}
+        />
       </div>
     </section>
   );

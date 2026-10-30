@@ -37,6 +37,11 @@ export function formatProductLabel({ name, sku }: { name: string; sku: string | 
   return sku ? `${name} - ${sku}` : name;
 }
 
+/** Nombre del usuario para listas y selectores (cae al usuario de acceso si no tiene nombre). */
+export function formatUserLabel({ name, email }: { name: string | null; email: string }): string {
+  return name?.trim() || email;
+}
+
 interface Schedule {
   scheduledDate: Date | null;
   scheduledFrom: string | null;

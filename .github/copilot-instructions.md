@@ -20,6 +20,8 @@ Sí puedes ejecutar libremente contra bases **locales o temporales** (por ejempl
 | `npm run dev` / `npm run build` | Servidor de desarrollo / build | ✅ Sí |
 | `npm run db:push` | Sincroniza `schema.prisma` con la base | ❌ No — la ejecuta el usuario |
 | `npm run db:rls` | Activa RLS y blinda la base en Supabase | ❌ No — la ejecuta el usuario |
+| `npm run db:inventory-model` | Prepara el catálogo general + inventario por usuario (copia stock/precios a `inventory_items`); va **antes** de `db:push --accept-data-loss` | ❌ No — la ejecuta el usuario |
+| `npm run db:post-push` | Registra el stock migrado como movimiento inicial y crea el cobro de las ventas ya pagadas; va **después** de `db:push` | ❌ No — la ejecuta el usuario |
 | `npm run db:seed` | Crea el admin inicial desde las variables `SEED_ADMIN_*` | ❌ No — la ejecuta el usuario |
 | `npm run db:copy-products` | Copia el catálogo entre dos bases | ❌ No — la ejecuta el usuario |
 
@@ -30,7 +32,9 @@ Sí puedes ejecutar libremente contra bases **locales o temporales** (por ejempl
 - **No hay migraciones versionadas.** El flujo es `prisma db push`; no existe `prisma/migrations/` y no debe introducirse `prisma migrate dev` sin acordarlo: con el esquema creado por `db push`, Prisma detecta drift y ofrece **resetear la base**.
 - **Después de cada `db push` que cree tablas, hay que ejecutar `npm run db:rls`.** [prisma/enable-rls.sql](../prisma/enable-rls.sql) activa RLS sin políticas y le quita permisos a los roles `anon` y `authenticated` de Supabase, de modo que la API pública no puede leer ni escribir nada. La aplicación no se ve afectada porque se conecta como `postgres`.
 - En Supabase se usa el **pooler de sesión (puerto 5432)** para `db push`; el de transacciones (6543) no sirve para DDL.
-- Modelos: `User`, `Product`, `Order`, `OrderItem` (mapeados a `users`, `products`, `orders`, `order_items`). Roles: `ADMIN`, `STAFF`, `COURIER`.
+- Modelos: `User`, `Product`, `InventoryItem`, `InventoryMovement`, `Order`, `OrderItem`, `Payment` (mapeados a `users`, `products`, `inventory_items`, `inventory_movements`, `orders`, `order_items`, `payments`). Roles: `ADMIN`, `STAFF`, `RESELLER`, `COURIER`.
+- **Cobros**: una venta se cobra con uno o varios `Payment` (importe, método, quién lo recibió). `Order.paymentStatus` (Pendiente, Parcial, Pagado) se calcula con `refreshPaymentStatus` de [src/lib/payments.ts](../src/lib/payments.ts); nunca se edita a mano. Un cobro no se borra: se anula con motivo.
+- **Catálogo + inventario por usuario**: `Product` es el catálogo general (nombre y SKU, lo administra el ADMIN). Cada usuario tiene `InventoryItem` por producto con su `stock`, `costPrice` (precio real) y `price` (venta). El stock solo cambia por `InventoryMovement` (entrada, salida, venta, devolución) con motivo obligatorio, vía `applyStockChange` de [src/lib/inventory-movements.ts](../src/lib/inventory-movements.ts). Cada `Order` tiene un `sellerId` y `OrderItem.unitCost` guarda el costo al vender; un pedido cancelado devuelve su stock. El alcance por rol se resuelve en [src/lib/inventory-scope.ts](../src/lib/inventory-scope.ts).
 - Usa siempre la instancia compartida de [src/lib/prisma.ts](../src/lib/prisma.ts); no instancies `PrismaClient` en código de la aplicación.
 
 ## Convenciones de código

@@ -1,5 +1,7 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
+
 import { DeliveryMethod, DeliveryStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
@@ -8,6 +10,13 @@ import { ActionResult } from '@/lib/action-result';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
 import { calculateShippingPrice } from '@/lib/shipping';
 import { InsufficientStockError, OrderNotFoundError, ValidationError } from '@/lib/errors';
+import { applyStockChange } from '@/lib/inventory-movements';
+import { assertOwnsInventory, resolveActingOwnerId, resolveOwnerFilter } from '@/lib/inventory-scope';
+import type { SessionPayload } from '@/lib/jwt';
+import { assertCanHandleOrder, canHandleAnyOrder } from '@/lib/order-access';
+import { ORDER_WITH_ITEMS } from '@/lib/order-include';
+import { refreshPaymentStatus } from '@/lib/payments';
+import { INVENTORY_ROLES } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireSession } from '@/lib/session';
 import {
@@ -40,6 +49,8 @@ interface ParsedOrderItem {
 
 export interface OrderInput {
   reference: string;
+  /** Solo el administrador: vende desde el inventario de ese usuario. Al editar se ignora (la venta conserva su vendedor). */
+  sellerId?: string;
   deliveryMethod: DeliveryMethod;
   address?: string;
   /** Fecha AAAA-MM-DD y horas HH:mm de la entrega o recogida. */
@@ -49,25 +60,28 @@ export interface OrderInput {
   /** Solo aplica al envio a domicilio. El precio del envio se calcula: kilometros x tarifa por km. */
   distanceKm?: string | number;
   paymentMethod: PaymentMethod;
-  paymentStatus: PaymentStatus;
+  /** Solo al registrar: si ya se cobro todo, se crea el cobro por el total con el metodo indicado. */
+  isPaid?: boolean;
   deliveryStatus: DeliveryStatus;
   items: OrderItemInput[];
 }
-
-const ORDER_WITH_ITEMS = {
-  items: { include: { product: { select: { id: true, name: true, sku: true } } } },
-} satisfies Prisma.OrderInclude;
 
 export type OrderWithItems = Prisma.OrderGetPayload<{ include: typeof ORDER_WITH_ITEMS }>;
 
 type TransactionClient = Prisma.TransactionClient;
 type StockMovement = { productId: string; quantity: number };
 
-export async function getOrders(): Promise<ActionResult<OrderWithItems[]>> {
+/**
+ * Ventas visibles para el usuario: el administrador ve todas (o las de un vendedor si pasa su id); un tendero,
+ * solo las suyas.
+ */
+export async function getOrders(seller?: string): Promise<ActionResult<OrderWithItems[]>> {
   return executeAction('orders.getOrders', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+    const session = await requireRole(...INVENTORY_ROLES);
+    const { ownerId } = resolveOwnerFilter(session, seller, true);
 
     const orders = await prisma.order.findMany({
+      where: ownerId ? { sellerId: ownerId } : {},
       include: ORDER_WITH_ITEMS,
       orderBy: { createdAt: 'desc' },
     });
@@ -77,15 +91,16 @@ export async function getOrders(): Promise<ActionResult<OrderWithItems[]>> {
   });
 }
 
-/** Domicilios por atender (envio a domicilio sin entregar), ordenados por horario. Disponible para todos los roles. */
+/** Domicilios por atender (envio a domicilio sin entregar), ordenados por horario. Quien no es domiciliario solo ve los suyos. */
 export async function getDeliveries(): Promise<ActionResult<OrderWithItems[]>> {
   return executeAction('orders.getDeliveries', async (trace) => {
-    await requireSession();
+    const session = await requireSession();
 
     const deliveries = await prisma.order.findMany({
       where: {
         deliveryMethod: DeliveryMethod.DELIVERY,
         deliveryStatus: { in: OPEN_DELIVERY_STATUSES },
+        ...(canHandleAnyOrder(session) ? {} : { sellerId: session.userId }),
       },
       include: ORDER_WITH_ITEMS,
       orderBy: [
@@ -103,19 +118,52 @@ export async function getDeliveries(): Promise<ActionResult<OrderWithItems[]>> {
 /**
  * Registra la venta y descuenta el stock dentro de una unica transaccion.
  * El precio unitario se toma del catalogo (nunca del cliente) para evitar manipulacion de totales.
+ * Los productos deben pertenecer al inventario del vendedor.
  */
 export async function createOrder(input: OrderInput): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.createOrder', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+    const session = await requireRole(...INVENTORY_ROLES);
 
     const orderData = parseOrderInput(input);
+    const sellerId = await resolveActingOwnerId(session, input.sellerId);
+    const orderId = randomUUID();
     trace.addStep(`datos-validados:${orderData.items.length}-items`);
 
     const createdOrder = await prisma.$transaction(async (transaction) => {
-      const { orderItems, total } = await reserveStock(transaction, orderData.items);
+      const { orderItems, total } = await buildOrderItems(transaction, orderData.items, sellerId);
+
+      await syncStock(transaction, {
+        sellerId,
+        userId: session.userId,
+        orderId,
+        previous: [],
+        next: holdsStock(orderData.fields.deliveryStatus) ? orderItems : [],
+        returnReason: 'Venta registrada',
+        saleReason: 'Venta registrada',
+      });
+
+      const orderTotal = withShipping(total, orderData.fields.shippingPrice);
+      const isPaid = input.isPaid === true && holdsStock(orderData.fields.deliveryStatus);
 
       return transaction.order.create({
-        data: { ...orderData.fields, total: withShipping(total, orderData.fields.shippingPrice), items: { create: orderItems } },
+        data: {
+          id: orderId,
+          ...orderData.fields,
+          sellerId,
+          total: orderTotal,
+          paymentStatus: isPaid ? PaymentStatus.PAID : PaymentStatus.PENDING,
+          items: { create: orderItems },
+          payments: isPaid
+            ? {
+                create: {
+                  amount: orderTotal,
+                  method: orderData.fields.paymentMethod,
+                  receivedById: session.userId,
+                  note: 'Pago completo al registrar la venta',
+                },
+              }
+            : undefined,
+        },
         include: ORDER_WITH_ITEMS,
       });
     });
@@ -129,12 +177,12 @@ export async function createOrder(input: OrderInput): Promise<ActionResult<Order
 }
 
 /**
- * Edita la venta completa. Primero devuelve al inventario lo que la venta tenia reservado
- * y luego reserva los productos nuevos, de modo que el stock siempre queda consistente.
+ * Edita la venta completa. El stock se ajusta solo por la diferencia entre lo que la venta tenia reservado y lo
+ * que reserva ahora, de modo que el inventario siempre queda consistente y el historial sin ruido.
  */
 export async function updateOrder(orderId: string, input: OrderInput): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.updateOrder', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+    const session = await requireRole(...INVENTORY_ROLES);
     trace.setBusinessId(orderId);
 
     const orderData = parseOrderInput(input);
@@ -149,19 +197,36 @@ export async function updateOrder(orderId: string, input: OrderInput): Promise<A
         throw new OrderNotFoundError(orderId);
       }
 
-      await restoreStock(transaction, currentOrder.items);
-      const agreedPrices = new Map(currentOrder.items.map((item) => [item.productId, item.unitPrice]));
-      const { orderItems, total } = await reserveStock(transaction, orderData.items, agreedPrices);
+      assertOwnsInventory(session, currentOrder.sellerId);
 
-      return transaction.order.update({
+      const agreed = {
+        prices: new Map(currentOrder.items.map((item) => [item.productId, item.unitPrice])),
+        costs: new Map(currentOrder.items.map((item) => [item.productId, item.unitCost])),
+      };
+      const { orderItems, total } = await buildOrderItems(transaction, orderData.items, currentOrder.sellerId, agreed);
+
+      await syncStock(transaction, {
+        sellerId: currentOrder.sellerId,
+        userId: session.userId,
+        orderId,
+        previous: holdsStock(currentOrder.deliveryStatus) ? currentOrder.items : [],
+        next: holdsStock(orderData.fields.deliveryStatus) ? orderItems : [],
+        returnReason: 'Venta editada: se devuelve lo que ya no se vende',
+        saleReason: 'Venta editada',
+      });
+
+      await transaction.order.update({
         where: { id: orderId },
         data: {
           ...orderData.fields,
           total: withShipping(total, orderData.fields.shippingPrice),
           items: { deleteMany: {}, create: orderItems },
         },
-        include: ORDER_WITH_ITEMS,
       });
+      // Si cambio el total, el estado de pago se recalcula con los cobros ya registrados.
+      await refreshPaymentStatus(transaction, orderId);
+
+      return transaction.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_WITH_ITEMS });
     });
 
     trace.addStep(`venta-editada:total=${updatedOrder.total}`);
@@ -171,24 +236,24 @@ export async function updateOrder(orderId: string, input: OrderInput): Promise<A
   });
 }
 
-export async function updatePaymentStatus(
+export async function updatePaymentMethod(
   orderId: string,
-  paymentStatus: PaymentStatus,
+  paymentMethod: PaymentMethod,
 ): Promise<ActionResult<OrderWithItems>> {
-  return executeAction('orders.updatePaymentStatus', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+  return executeAction('orders.updatePaymentMethod', async (trace) => {
+    const session = await requireSession();
     trace.setBusinessId(orderId);
 
-    const newPaymentStatus = requireEnumValue(paymentStatus, PaymentStatus, 'estado del pago');
-    await ensureOrderExists(orderId);
+    const newPaymentMethod = requireEnumValue(paymentMethod, PaymentMethod, 'metodo de pago');
+    await ensureOrderAccess(session, orderId);
 
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { paymentStatus: newPaymentStatus },
+      data: { paymentMethod: newPaymentMethod },
       include: ORDER_WITH_ITEMS,
     });
 
-    trace.addStep(`estado-pago:${updatedOrder.paymentStatus}`);
+    trace.addStep(`metodo-pago:${updatedOrder.paymentMethod}`);
 
     revalidateSalesViews();
     return updatedOrder;
@@ -200,16 +265,39 @@ export async function updateDeliveryStatus(
   deliveryStatus: DeliveryStatus,
 ): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.updateDeliveryStatus', async (trace) => {
-    await requireSession();
+    const session = await requireSession();
     trace.setBusinessId(orderId);
 
     const newDeliveryStatus = requireEnumValue(deliveryStatus, DeliveryStatus, 'estado de envio');
-    await ensureOrderExists(orderId);
 
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: { deliveryStatus: newDeliveryStatus },
-      include: ORDER_WITH_ITEMS,
+    // Cancelar devuelve el stock; reactivar un pedido cancelado lo vuelve a descontar.
+    const updatedOrder = await prisma.$transaction(async (transaction) => {
+      const currentOrder = await transaction.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      if (!currentOrder) {
+        throw new OrderNotFoundError(orderId);
+      }
+
+      assertCanHandleOrder(session, currentOrder.sellerId);
+
+      await syncStock(transaction, {
+        sellerId: currentOrder.sellerId,
+        userId: session.userId,
+        orderId,
+        previous: holdsStock(currentOrder.deliveryStatus) ? currentOrder.items : [],
+        next: holdsStock(newDeliveryStatus) ? currentOrder.items : [],
+        returnReason: 'Pedido cancelado',
+        saleReason: 'Pedido reactivado despues de cancelarlo',
+      });
+
+      return transaction.order.update({
+        where: { id: orderId },
+        data: { deliveryStatus: newDeliveryStatus },
+        include: ORDER_WITH_ITEMS,
+      });
     });
 
     trace.addStep(`estado-envio:${updatedOrder.deliveryStatus}`);
@@ -222,7 +310,7 @@ export async function updateDeliveryStatus(
 /** Elimina la venta y devuelve sus unidades al inventario. */
 export async function deleteOrder(orderId: string): Promise<ActionResult<void>> {
   return executeAction('orders.deleteOrder', async (trace) => {
-    await requireRole('ADMIN', 'STAFF');
+    const session = await requireRole(...INVENTORY_ROLES);
     trace.setBusinessId(orderId);
 
     await prisma.$transaction(async (transaction) => {
@@ -235,7 +323,17 @@ export async function deleteOrder(orderId: string): Promise<ActionResult<void>> 
         throw new OrderNotFoundError(orderId);
       }
 
-      await restoreStock(transaction, currentOrder.items);
+      assertOwnsInventory(session, currentOrder.sellerId);
+
+      await syncStock(transaction, {
+        sellerId: currentOrder.sellerId,
+        userId: session.userId,
+        orderId,
+        previous: holdsStock(currentOrder.deliveryStatus) ? currentOrder.items : [],
+        next: [],
+        returnReason: 'Venta eliminada',
+        saleReason: 'Venta eliminada',
+      });
       await transaction.order.delete({ where: { id: orderId } });
     });
 
@@ -245,11 +343,15 @@ export async function deleteOrder(orderId: string): Promise<ActionResult<void>> 
   });
 }
 
-async function ensureOrderExists(orderId: string): Promise<void> {
-  const existingOrder = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+async function ensureOrderAccess(session: SessionPayload, orderId: string): Promise<void> {
+  const existingOrder = await prisma.order.findUnique({ where: { id: orderId }, select: { sellerId: true } });
 
   if (!existingOrder) {
     throw new OrderNotFoundError(orderId);
+  }
+
+  if (!canHandleAnyOrder(session)) {
+    assertOwnsInventory(session, existingOrder.sellerId);
   }
 }
 
@@ -266,10 +368,9 @@ function parseOrderInput(input: OrderInput) {
       address: isDelivery ? requireText(input.address, 'direccion', 500) : null,
       ...parseSchedule(input),
       distanceKm,
-      // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado a miles.
+      // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado hacia arriba.
       shippingPrice: calculateShippingPrice(distanceKm ?? 0),
       paymentMethod: requireEnumValue(input.paymentMethod, PaymentMethod, 'metodo de pago'),
-      paymentStatus: requireEnumValue(input.paymentStatus, PaymentStatus, 'estado del pago'),
       deliveryStatus: requireEnumValue(input.deliveryStatus, DeliveryStatus, 'estado de envio'),
     },
     items: mergeDuplicatedItems(input.items),
@@ -297,64 +398,104 @@ function parseSchedule(input: OrderInput) {
   return { scheduledDate, scheduledFrom, scheduledTo };
 }
 
+/** Una venta cancelada no mantiene stock reservado: sus unidades vuelven al inventario. */
+function holdsStock(status: DeliveryStatus): boolean {
+  return status !== DeliveryStatus.CANCELLED;
+}
+
 /**
- * Reserva stock y fija precios. El precio de cada linea es, en orden: el indicado en la venta, el ya pactado
- * (al editar, para que cambiar el catalogo no altere ventas existentes) o el actual del catalogo.
+ * Fija precios y costos de cada linea. El precio es, en orden: el indicado en la venta, el ya pactado (al editar,
+ * para que cambiar el inventario no altere ventas existentes) o el actual del inventario del vendedor. El costo
+ * sigue la misma regla. Solo se admiten productos que esten en el inventario del vendedor.
  */
-async function reserveStock(
+async function buildOrderItems(
   transaction: TransactionClient,
   requestedItems: ParsedOrderItem[],
-  agreedPrices: Map<string, number> = new Map(),
+  sellerId: string,
+  agreed: { prices: Map<string, number>; costs: Map<string, number> } = { prices: new Map(), costs: new Map() },
 ) {
-  const products = await transaction.product.findMany({
-    where: { id: { in: requestedItems.map((item) => item.productId) } },
+  const inventoryItems = await transaction.inventoryItem.findMany({
+    where: { ownerId: sellerId, productId: { in: requestedItems.map((item) => item.productId) } },
   });
-  const productsById = new Map(products.map((product) => [product.id, product]));
+  const itemsByProduct = new Map(inventoryItems.map((item) => [item.productId, item]));
 
   const orderItems = requestedItems.map((item) => {
-    const product = productsById.get(item.productId);
+    const inventoryItem = itemsByProduct.get(item.productId);
 
-    if (!product) {
-      throw new ValidationError('Uno de los productos seleccionados ya no existe');
+    if (!inventoryItem) {
+      throw new ValidationError('Uno de los productos seleccionados no esta en el inventario de este vendedor');
     }
 
     return {
-      productId: product.id,
+      productId: item.productId,
       quantity: item.quantity,
-      unitPrice: item.unitPrice ?? agreedPrices.get(product.id) ?? product.price,
+      unitPrice: item.unitPrice ?? agreed.prices.get(item.productId) ?? inventoryItem.price,
+      unitCost: agreed.costs.get(item.productId) ?? inventoryItem.costPrice,
     };
   });
-
-  await consumeStock(transaction, orderItems, productsById);
 
   const total = orderItems.reduce((accumulated, item) => accumulated + item.unitPrice * item.quantity, 0);
   return { orderItems, total: roundToCents(total) };
 }
 
-async function restoreStock(transaction: TransactionClient, items: StockMovement[]): Promise<void> {
-  for (const item of items) {
-    await transaction.product.update({
-      where: { id: item.productId },
-      data: { stock: { increment: item.quantity } },
-    });
-  }
+interface StockSync {
+  sellerId: string;
+  userId: string;
+  orderId: string;
+  /** Unidades que la venta tenia reservadas antes del cambio. */
+  previous: StockMovement[];
+  /** Unidades que debe tener reservadas despues del cambio. */
+  next: StockMovement[];
+  returnReason: string;
+  saleReason: string;
 }
 
-async function consumeStock(
-  transaction: TransactionClient,
-  items: StockMovement[],
-  productsById: Map<string, { name: string }>,
-): Promise<void> {
-  for (const item of items) {
-    // El filtro por stock garantiza el descuento atomico aun con ventas simultaneas.
-    const stockUpdate = await transaction.product.updateMany({
-      where: { id: item.productId, stock: { gte: item.quantity } },
-      data: { stock: { decrement: item.quantity } },
+/**
+ * Ajusta el stock solo por la diferencia entre lo reservado antes y despues, por producto: si baja se devuelve
+ * al inventario y si sube se descuenta. Cada cambio deja su movimiento con motivo.
+ */
+async function syncStock(transaction: TransactionClient, sync: StockSync): Promise<void> {
+  const deltas = new Map<string, number>();
+
+  for (const item of sync.previous) {
+    deltas.set(item.productId, (deltas.get(item.productId) ?? 0) + item.quantity);
+  }
+
+  for (const item of sync.next) {
+    deltas.set(item.productId, (deltas.get(item.productId) ?? 0) - item.quantity);
+  }
+
+  // Primero las devoluciones, para que el stock devuelto ya este disponible al descontar otras lineas.
+  const changes = [...deltas].filter(([, delta]) => delta !== 0).sort((first, second) => second[1] - first[1]);
+
+  if (changes.length === 0) {
+    return;
+  }
+
+  const inventoryItems = await transaction.inventoryItem.findMany({
+    where: { ownerId: sync.sellerId, productId: { in: changes.map(([productId]) => productId) } },
+    include: { product: { select: { name: true } } },
+  });
+  const itemsByProduct = new Map(inventoryItems.map((item) => [item.productId, item]));
+
+  for (const [productId, delta] of changes) {
+    const inventoryItem = itemsByProduct.get(productId);
+
+    if (!inventoryItem) {
+      throw new ValidationError('Uno de los productos de la venta ya no esta en el inventario del vendedor');
+    }
+
+    const stock = await applyStockChange(transaction, {
+      inventoryItemId: inventoryItem.id,
+      delta,
+      type: delta > 0 ? 'SALE_RETURN' : 'SALE',
+      reason: delta > 0 ? sync.returnReason : sync.saleReason,
+      userId: sync.userId,
+      orderId: sync.orderId,
     });
 
-    if (stockUpdate.count === 0) {
-      const product = await transaction.product.findUnique({ where: { id: item.productId } });
-      throw new InsufficientStockError(productsById.get(item.productId)?.name ?? item.productId, product?.stock ?? 0);
+    if (stock === null) {
+      throw new InsufficientStockError(inventoryItem.product.name, inventoryItem.stock);
     }
   }
 }

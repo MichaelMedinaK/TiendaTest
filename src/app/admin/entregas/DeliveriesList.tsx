@@ -3,22 +3,18 @@
 import { Clock, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import type { DeliveryStatus } from '@prisma/client';
+import type { DeliveryStatus, PaymentMethod } from '@prisma/client';
 
-import { type OrderWithItems, updateDeliveryStatus } from '@/actions/orders';
+import { type OrderWithItems, updateDeliveryStatus, updatePaymentMethod } from '@/actions/orders';
 import { OrderItemsList } from '@/components/OrderItemsList';
+import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
-import { BADGE_CLASS, CARD_CLASS } from '@/components/ui/styles';
-import { formatCurrency, formatDateTime, formatSchedule, formatShipping } from '@/lib/format';
-import {
-  DELIVERY_STATUS_LABELS,
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_STATUS_BADGES,
-  PAYMENT_STATUS_LABELS,
-  toSelectOptions,
-} from '@/lib/labels';
+import { CARD_CLASS } from '@/components/ui/styles';
+import { formatDateTime, formatSchedule, formatShipping } from '@/lib/format';
+import { DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
 
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
+const PAYMENT_METHOD_OPTIONS = toSelectOptions(PAYMENT_METHOD_LABELS);
 
 export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] }) {
   const router = useRouter();
@@ -28,8 +24,8 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
   }
 
   // Al marcar entregado o devuelto el domicilio sale de la lista tras refrescar.
-  const changeStatus = async (orderId: string, nextStatus: DeliveryStatus) => {
-    const result = await updateDeliveryStatus(orderId, nextStatus);
+  const refreshAfter = async <TResult,>(action: Promise<TResult>): Promise<TResult> => {
+    const result = await action;
     router.refresh();
     return result;
   };
@@ -43,9 +39,6 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
               <h2 className="font-semibold text-slate-900">{order.reference}</h2>
               <p className="text-xs text-slate-500">{formatDateTime(order.createdAt)}</p>
             </div>
-            <span className={`${BADGE_CLASS} ${PAYMENT_STATUS_BADGES[order.paymentStatus]}`}>
-              {PAYMENT_STATUS_LABELS[order.paymentStatus]}
-            </span>
           </header>
 
           {formatSchedule(order) && (
@@ -64,17 +57,28 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
 
           <OrderItemsList items={order.items} className="text-sm" />
 
-          <p className="text-sm text-slate-600">
-            {PAYMENT_METHOD_LABELS[order.paymentMethod]} -{' '}
-            <span className="font-semibold text-slate-900">{formatCurrency(order.total)}</span>
-          </p>
+          <PaymentsControl order={order} />
 
-          <StatusSelect<DeliveryStatus>
-            ariaLabel={`Estado del envio de ${order.reference}`}
-            value={order.deliveryStatus}
-            options={DELIVERY_STATUS_OPTIONS}
-            onChangeAction={(nextStatus) => changeStatus(order.id, nextStatus)}
-          />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Metodo de pago</p>
+              <StatusSelect<PaymentMethod>
+                ariaLabel={`Metodo de pago de ${order.reference}`}
+                value={order.paymentMethod}
+                options={PAYMENT_METHOD_OPTIONS}
+                onChangeAction={(nextMethod) => refreshAfter(updatePaymentMethod(order.id, nextMethod))}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Pedido</p>
+              <StatusSelect<DeliveryStatus>
+                ariaLabel={`Estado del envio de ${order.reference}`}
+                value={order.deliveryStatus}
+                options={DELIVERY_STATUS_OPTIONS}
+                onChangeAction={(nextStatus) => refreshAfter(updateDeliveryStatus(order.id, nextStatus))}
+              />
+            </div>
+          </div>
         </article>
       ))}
     </div>

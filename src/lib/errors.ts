@@ -89,6 +89,24 @@ export class ProductInUseError extends BusinessError {
   }
 }
 
+export class ProductInInventoryError extends BusinessError {
+  constructor(productName: string, inventoriesCount: number) {
+    super(`No se puede eliminar "${productName}" porque esta en ${inventoriesCount} inventario(s)`);
+  }
+}
+
+export class ProductAlreadyInInventoryError extends BusinessError {
+  constructor(productName: string) {
+    super(`"${productName}" ya esta en este inventario. Registra una entrada para sumar stock`);
+  }
+}
+
+export class InventoryItemNotFoundError extends BusinessError {
+  constructor(itemId: string) {
+    super(`No se encontro el producto ${itemId} en el inventario`);
+  }
+}
+
 export class OrderNotFoundError extends BusinessError {
   constructor(orderId: string) {
     super(`No se encontro la venta ${orderId}`);

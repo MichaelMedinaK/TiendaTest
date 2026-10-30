@@ -4,12 +4,12 @@ import { redirect } from 'next/navigation';
 
 import { LogoutButton } from '@/components/LogoutButton';
 import { MobileMenu } from '@/components/MobileMenu';
-import { NewSaleButton } from '@/components/NewSaleButton';
+import { QuickAddButton } from '@/components/QuickAddButton';
 import { SidebarNavigation } from '@/components/SidebarNavigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LOGIN_ROUTE } from '@/lib/constants';
 import { ROLE_LABELS } from '@/lib/labels';
-import { ROLE_HOME_ROUTE, canAccessRoute } from '@/lib/permissions';
+import { ROLE_HOME_ROUTE } from '@/lib/permissions';
 import { getCurrentSession } from '@/lib/session';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +19,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect(LOGIN_ROUTE);
   }
 
-  const canCreateSales = canAccessRoute(session.role, '/admin/ventas');
   const homeHref = ROLE_HOME_ROUTE[session.role];
 
   return (
@@ -41,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Store className="h-6 w-6 text-brand-600" />
             <span className="text-lg font-bold text-slate-900">Tienda Test</span>
           </Link>
-          {canCreateSales && <NewSaleButton variant="sidebar" />}
+          <QuickAddButton variant="sidebar" />
           <SidebarNavigation role={session.role} />
         </div>
 
@@ -57,7 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
 
-      {canCreateSales && <NewSaleButton variant="floating" />}
+      <QuickAddButton variant="floating" />
     </div>
   );
 }

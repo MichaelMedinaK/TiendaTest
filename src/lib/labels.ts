@@ -1,5 +1,5 @@
 // Import de solo tipos: evita empaquetar el cliente Prisma en el bundle del navegador.
-import type { DeliveryMethod, DeliveryStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
+import type { DeliveryMethod, DeliveryStatus, MovementType, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 
 /** Etiquetas en espanol centralizadas para no duplicar textos en cada vista. */
 export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
@@ -9,6 +9,7 @@ export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   PENDING: 'Pendiente de pago',
+  PARTIAL: 'Pago parcial',
   PAID: 'Pagado',
 };
 
@@ -25,14 +26,23 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   TRANSFER: 'Transferencia',
 };
 
+export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
+  ENTRY: 'Entrada',
+  EXIT: 'Salida',
+  SALE: 'Venta',
+  SALE_RETURN: 'Devolucion por venta',
+};
+
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrador',
   STAFF: 'Tendero',
+  RESELLER: 'Revendedor',
   COURIER: 'Domiciliario',
 };
 
 export const PAYMENT_STATUS_BADGES: Record<PaymentStatus, string> = {
   PENDING: 'bg-amber-100 text-amber-800',
+  PARTIAL: 'bg-sky-100 text-sky-800',
   PAID: 'bg-emerald-100 text-emerald-800',
 };
 

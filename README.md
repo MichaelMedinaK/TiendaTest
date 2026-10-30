@@ -109,5 +109,7 @@ src/
 | `npm run lint`             | ESLint                                         |
 | `npm run db:push`          | Sincroniza el esquema con la base de datos     |
 | `npm run db:rls`           | Activa RLS y blinda la base (Supabase)         |
+| `npm run db:inventory-model` | Prepara el catalogo general + inventario por usuario (antes de `db:push`) |
+| `npm run db:post-push` | Datos iniciales del modelo nuevo: stock inicial y cobros de ventas ya pagadas (después de `db:push`) |
 | `npm run db:seed`          | Ejecuta el seed                                |
 | `npm run db:copy-products` | Copia el catálogo de productos entre dos bases |

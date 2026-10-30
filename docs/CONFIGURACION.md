@@ -93,6 +93,17 @@ Ejemplos de zona horaria: `America/Lima`, `America/Bogota`, `America/Mexico_City
 
 > La zona horaria se fija explícitamente para que el servidor y el navegador muestren siempre la misma fecha.
 
+### Cotización del delivery
+
+El precio se calcula como kilómetros × `NEXT_PUBLIC_DELIVERY_RATE_PER_KM`, redondeado hacia arriba a la unidad (4.7 km × 1.7 = 7.99 → 8). Los kilómetros se obtienen por carretera entre un punto fijo (la tienda) y la dirección escrita, usando OpenStreetMap (Nominatim para ubicar la dirección y OSRM para la ruta), sin clave de API. Estas variables solo las lee el servidor.
+
+| Variable                  | Obligatoria | Descripción                                                                                   |
+| ------------------------- | :---------: | --------------------------------------------------------------------------------------------- |
+| `STORE_ORIGIN_LAT`        |     Sí      | Latitud del punto de salida. En Google Maps: clic derecho sobre la tienda y copia las coordenadas |
+| `STORE_ORIGIN_LNG`        |     Sí      | Longitud del punto de salida                                                                  |
+| `STORE_ORIGIN_LABEL`      |     No      | Nombre que se muestra como origen (por defecto `la tienda`)                                   |
+| `GEOCODING_COUNTRY_CODES` |     No      | Limita la búsqueda a países, códigos ISO separados por coma (ej. `pe`)                        |
+
 ---
 
 ## Ejemplo completo

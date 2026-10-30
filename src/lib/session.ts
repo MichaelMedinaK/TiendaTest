@@ -59,7 +59,7 @@ export async function requireSession(): Promise<SessionPayload> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { isActive: true, role: true },
+    select: { isActive: true, role: true, isCourier: true },
   });
 
   if (!user) {
@@ -70,7 +70,7 @@ export async function requireSession(): Promise<SessionPayload> {
     throw new InactiveUserError();
   }
 
-  return { ...session, role: user.role };
+  return { ...session, role: user.role, isCourier: user.isCourier };
 }
 
 /** Exige una sesion valida cuyo rol (leido de la base de datos) este entre los permitidos. */

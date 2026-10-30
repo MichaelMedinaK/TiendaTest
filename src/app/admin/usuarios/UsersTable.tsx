@@ -1,10 +1,10 @@
 'use client';
 
-import { Power, PowerOff } from 'lucide-react';
+import { Power, PowerOff, Truck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 
-import { type UserSummary, toggleUserStatus } from '@/actions/users';
+import { type UserSummary, setCourierProfile, toggleUserStatus } from '@/actions/users';
 import {
   BADGE_CLASS,
   CARD_CLASS,
@@ -81,6 +81,20 @@ function UserRow({ user }: { user: UserSummary }) {
     });
   };
 
+  const handleToggleCourier = () => {
+    startTransition(async () => {
+      const result = await setCourierProfile(user.id, !user.isCourier);
+
+      if (!result.success) {
+        feedback.error(result.error);
+        return;
+      }
+
+      feedback.success(`${user.email} ${user.isCourier ? 'ya no es' : 'ahora tambien es'} domiciliario`);
+      router.refresh();
+    });
+  };
+
   return (
     <tbody className={STACKED_GROUP_CLASS}>
       <tr className={STACKED_ROW_CLASS}>
@@ -88,7 +102,10 @@ function UserRow({ user }: { user: UserSummary }) {
           <p>{user.name ?? 'Sin nombre'}</p>
           <p className="text-xs font-normal text-slate-500">{user.email}</p>
         </td>
-        <td data-label="Rol" className={STACKED_CELL_CLASS}>{ROLE_LABELS[user.role]}</td>
+        <td data-label="Rol" className={STACKED_CELL_CLASS}>
+          {ROLE_LABELS[user.role]}
+          {user.isCourier && <span className="block text-xs text-sky-700">+ Domiciliario</span>}
+        </td>
         <td data-label="Estado" className={STACKED_CELL_CLASS}>
           <span className={`${BADGE_CLASS} ${user.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
             {user.isActive ? 'Activo' : 'Inactivo'}
@@ -96,11 +113,17 @@ function UserRow({ user }: { user: UserSummary }) {
         </td>
         <td data-label="Creado" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>{formatDateTime(user.createdAt)}</td>
         <td data-label="Acceso" className={STACKED_CELL_CLASS}>
-          <div>
+          <div className="flex flex-wrap gap-2">
             <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isPending} onClick={handleToggle}>
               {user.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
               {user.isActive ? 'Desactivar' : 'Activar'}
             </button>
+            {(user.role === 'STAFF' || user.role === 'RESELLER') && (
+              <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isPending} onClick={handleToggleCourier}>
+                <Truck className="h-4 w-4" />
+                {user.isCourier ? 'Quitar domiciliario' : 'Hacer domiciliario'}
+              </button>
+            )}
           </div>
         </td>
         <td data-label="Clave" className={STACKED_CELL_CLASS}>

@@ -31,6 +31,7 @@ export interface UserSummary {
   name: string | null;
   role: Role;
   isActive: boolean;
+  isCourier: boolean;
   createdAt: Date;
 }
 
@@ -39,6 +40,23 @@ export interface CreateUserInput {
   email: string;
   password: string;
   role: Role;
+  /** Perfil adicional de domiciliario; solo aplica a tenderos y revendedores. */
+  isCourier?: boolean;
+}
+
+const USER_SUMMARY_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  isActive: true,
+  isCourier: true,
+  createdAt: true,
+} as const;
+
+/** Solo quienes venden pueden sumar el perfil de domiciliario: el admin ya lo puede todo y el domiciliario ya lo es. */
+function canHaveCourierProfile(role: Role): boolean {
+  return role === Role.STAFF || role === Role.RESELLER;
 }
 
 export async function getUsers(): Promise<ActionResult<UserSummary[]>> {
@@ -47,7 +65,7 @@ export async function getUsers(): Promise<ActionResult<UserSummary[]>> {
 
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: USER_SUMMARY_SELECT,
     });
 
     trace.addStep(`usuarios-listados:${users.length}`);
@@ -73,8 +91,14 @@ export async function createUser(input: CreateUserInput): Promise<ActionResult<U
     }
 
     const createdUser = await prisma.user.create({
-      data: { email, name, role, password: await hashPassword(password) },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      data: {
+        email,
+        name,
+        role,
+        isCourier: canHaveCourierProfile(role) && input.isCourier === true,
+        password: await hashPassword(password),
+      },
+      select: USER_SUMMARY_SELECT,
     });
 
     trace.setBusinessId(createdUser.id);
@@ -104,10 +128,39 @@ export async function toggleUserStatus(userId: string, isActive: boolean): Promi
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { isActive },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: USER_SUMMARY_SELECT,
     });
 
     trace.addStep(`estado-actualizado:${isActive ? 'ACTIVO' : 'INACTIVO'}`);
+
+    revalidatePath(USERS_ROUTE);
+    return updatedUser;
+  });
+}
+
+/** Da o quita el perfil de domiciliario a un tendero o revendedor. */
+export async function setCourierProfile(userId: string, isCourier: boolean): Promise<ActionResult<UserSummary>> {
+  return executeAction('users.setCourierProfile', async (trace) => {
+    await requireAdminSession();
+    trace.setBusinessId(userId);
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+
+    if (!targetUser) {
+      throw new UserNotFoundError(userId);
+    }
+
+    if (!canHaveCourierProfile(targetUser.role)) {
+      throw new ForbiddenError('Solo un tendero o un revendedor puede tener el perfil de domiciliario');
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { isCourier },
+      select: USER_SUMMARY_SELECT,
+    });
+
+    trace.addStep(`perfil-domiciliario:${isCourier ? 'SI' : 'NO'}`);
 
     revalidatePath(USERS_ROUTE);
     return updatedUser;
@@ -133,7 +186,7 @@ export async function resetUserPassword(userId: string, newPassword: string): Pr
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { password: await hashPassword(password) },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: USER_SUMMARY_SELECT,
     });
 
     trace.addStep('clave-reseteada-por-admin');

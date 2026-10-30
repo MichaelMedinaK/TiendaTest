@@ -4,29 +4,58 @@ import { PackagePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useTransition } from 'react';
 
-import { createProduct } from '@/actions/products';
+import { type CatalogOption, addToInventory } from '@/actions/products';
+import { FormPanel } from '@/components/FormPanel';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
+import { NEW_PRODUCT_ANCHOR } from '@/lib/constants';
+import { formatProductLabel } from '@/lib/format';
 
-export function NewProductForm() {
+interface AddToInventoryFormProps {
+  ownerId: string;
+  /** Productos del catalogo que todavia no estan en este inventario. */
+  catalog: CatalogOption[];
+}
+
+export function AddToInventoryForm({ ownerId, catalog }: AddToInventoryFormProps) {
+  return (
+    <FormPanel anchorId={NEW_PRODUCT_ANCHOR} label="Agregar al inventario">
+      {(close) => <InventoryForm ownerId={ownerId} catalog={catalog} onDone={close} />}
+    </FormPanel>
+  );
+}
+
+function InventoryForm({ ownerId, catalog, onDone }: AddToInventoryFormProps & { onDone: () => void }) {
   const router = useRouter();
   const toast = useFeedback();
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  if (catalog.length === 0) {
+    return (
+      <div className={CARD_CLASS}>
+        <FeedbackMessage
+          tone="error"
+          message="No hay productos del catalogo por agregar. El administrador crea los productos nuevos en Catalogo"
+        />
+      </div>
+    );
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    const formData = new FormData(event.currentTarget);
     setFeedback(null);
 
     startTransition(async () => {
-      const result = await createProduct({
-        name: String(formData.get('name') ?? ''),
-        sku: String(formData.get('sku') ?? ''),
+      const result = await addToInventory({
+        productId: String(formData.get('productId') ?? ''),
+        costPrice: Number(formData.get('costPrice')),
         price: Number(formData.get('price')),
-        stock: Number(formData.get('stock')),
+        quantity: Number(formData.get('quantity')),
+        reason: String(formData.get('reason') ?? ''),
+        ownerId,
       });
 
       if (!result.success) {
@@ -34,43 +63,63 @@ export function NewProductForm() {
         return;
       }
 
-      form.reset();
-      toast.success(`Producto "${result.data.name}" creado`);
+      toast.success(`"${result.data.name}" agregado al inventario`);
       router.refresh();
+      onDone();
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className={`${CARD_CLASS} space-y-4`}>
-      <h2 className="text-lg font-semibold text-slate-900">Agregar producto</h2>
+      <h2 className="text-lg font-semibold text-slate-900">Agregar producto al inventario</h2>
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <div className="sm:col-span-2">
-          <label className={LABEL_CLASS} htmlFor="name">
-            Nombre
+        <div className="sm:col-span-4">
+          <label className={LABEL_CLASS} htmlFor="productId">
+            Producto del catalogo
           </label>
-          <input id="name" name="name" required className={INPUT_CLASS} placeholder="Camiseta basica" />
+          <select id="productId" name="productId" required className={INPUT_CLASS}>
+            {catalog.map((product) => (
+              <option key={product.id} value={product.id}>
+                {formatProductLabel(product)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
-          <label className={LABEL_CLASS} htmlFor="sku">
-            SKU
+          <label className={LABEL_CLASS} htmlFor="costPrice">
+            Precio real (costo)
           </label>
-          <input id="sku" name="sku" className={INPUT_CLASS} placeholder="CAM-001" />
+          <input id="costPrice" name="costPrice" type="number" min={0} step="any" defaultValue={0} required className={INPUT_CLASS} />
         </div>
 
         <div>
           <label className={LABEL_CLASS} htmlFor="price">
-            Precio
+            Precio de venta
           </label>
-          <input id="price" name="price" type="number" min={0.01} step={0.01} required className={INPUT_CLASS} />
+          <input id="price" name="price" type="number" min={0.01} step="any" required className={INPUT_CLASS} />
         </div>
 
         <div>
-          <label className={LABEL_CLASS} htmlFor="stock">
+          <label className={LABEL_CLASS} htmlFor="quantity">
             Stock inicial
           </label>
-          <input id="stock" name="stock" type="number" min={0} step={1} defaultValue={0} required className={INPUT_CLASS} />
+          <input id="quantity" name="quantity" type="number" min={0} step={1} defaultValue={0} required className={INPUT_CLASS} />
+        </div>
+
+        <div>
+          <label className={LABEL_CLASS} htmlFor="reason">
+            Descripcion del stock
+          </label>
+          <input
+            id="reason"
+            name="reason"
+            maxLength={500}
+            defaultValue="Stock inicial"
+            className={INPUT_CLASS}
+            placeholder="Obligatoria si hay stock"
+          />
         </div>
       </div>
 
@@ -78,7 +127,7 @@ export function NewProductForm() {
 
       <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
         <PackagePlus className="h-4 w-4" />
-        {isPending ? 'Guardando...' : 'Agregar producto'}
+        {isPending ? 'Guardando...' : 'Agregar al inventario'}
       </button>
     </form>
   );
