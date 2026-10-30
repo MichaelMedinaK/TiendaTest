@@ -21,14 +21,20 @@ enum PaymentStatus {
 
 enum DeliveryStatus {
   PENDING
+  PACKED
   IN_TRANSIT
   DELIVERED
-  RETURNED
+  CANCELLED
 }
 
 enum PaymentMethod {
   CASH
   TRANSFER
+}
+
+enum DeliveryMethod {
+  DELIVERY
+  PICKUP
 }
 
 model User {
@@ -59,9 +65,14 @@ model Product {
 
 model Order {
   id             String         @id @default(uuid())
-  description    String
-  reference      String?
+  reference      String
+  deliveryMethod DeliveryMethod @default(PICKUP)
   address        String?
+  scheduledDate  DateTime?      @db.Date
+  scheduledFrom  String?
+  scheduledTo    String?
+  distanceKm     Float?
+  shippingPrice  Float          @default(0)
   paymentMethod  PaymentMethod  @default(CASH)
   paymentStatus  PaymentStatus  @default(PENDING)
   deliveryStatus DeliveryStatus @default(PENDING)
