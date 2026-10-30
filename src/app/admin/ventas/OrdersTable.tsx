@@ -1,23 +1,34 @@
 'use client';
 
 import { Pencil, Trash2 } from 'lucide-react';
-import { Fragment, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { DeliveryStatus, PaymentStatus, Product } from '@prisma/client';
 
 import { type OrderWithItems, deleteOrder, updateDeliveryStatus, updatePaymentStatus } from '@/actions/orders';
+import { OrderItemsList } from '@/components/OrderItemsList';
 import { StatusSelect } from '@/components/StatusSelect';
+import { useFeedback } from '@/components/ui/FeedbackProvider';
 import {
   BADGE_CLASS,
   CARD_CLASS,
   SECONDARY_BUTTON_CLASS,
-  TABLE_CELL_CLASS,
-  TABLE_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_EDIT_CELL_CLASS,
+  STACKED_EDIT_ROW_CLASS,
+  STACKED_GROUP_ACTIVE_CLASS,
+  STACKED_GROUP_CLASS,
+  STACKED_HEAD_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_TITLE_CELL_CLASS,
+  STACKED_WRAPPER_CLASS,
   TABLE_HEAD_CELL_CLASS,
 } from '@/components/ui/styles';
-import { formatCurrency, formatDateTime } from '@/lib/format';
+import { formatCurrency, formatDateTime, formatSchedule, formatShipping } from '@/lib/format';
 import {
+  DELIVERY_METHOD_LABELS,
   DELIVERY_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_BADGES,
@@ -47,12 +58,12 @@ export function OrdersTable({ orders, products }: { orders: OrderWithItems[]; pr
   }
 
   return (
-    <div className={`${CARD_CLASS} overflow-x-auto p-0`}>
-      <table className={TABLE_CLASS}>
-        <thead className="bg-slate-50">
+    <div className={STACKED_WRAPPER_CLASS}>
+      <table className={STACKED_TABLE_CLASS}>
+        <thead className={STACKED_HEAD_CLASS}>
           <tr>
-            <th className={TABLE_HEAD_CELL_CLASS}>Fecha</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Venta</th>
+            <th className={TABLE_HEAD_CELL_CLASS}>Fecha</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Productos</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Pago</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Total</th>
@@ -60,107 +71,109 @@ export function OrdersTable({ orders, products }: { orders: OrderWithItems[]; pr
             <th className={TABLE_HEAD_CELL_CLASS}>Acciones</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
-          {orders.map((order) => (
-            <Fragment key={order.id}>
-              <tr className="hover:bg-slate-50">
-                <td className={`${TABLE_CELL_CLASS} whitespace-nowrap`}>{formatDateTime(order.createdAt)}</td>
-                <td className={TABLE_CELL_CLASS}>
-                  <p className="font-medium text-slate-900">{order.description}</p>
-                  <p className="text-xs text-slate-500">Ref: {order.reference ?? '-'}</p>
-                  <p className="text-xs text-slate-500">{order.address ?? 'Retiro en tienda'}</p>
-                </td>
-                <td className={TABLE_CELL_CLASS}>
-                  <ul className="space-y-0.5 text-xs text-slate-600">
-                    {order.items.map((item) => (
-                      <li key={item.id}>
-                        {item.quantity} x {item.product.name}
-                      </li>
-                    ))}
-                  </ul>
-                </td>
-                <td className={TABLE_CELL_CLASS}>
+        {orders.map((order) => (
+          <tbody
+            key={order.id}
+            className={`${STACKED_GROUP_CLASS} ${editingOrderId === order.id ? STACKED_GROUP_ACTIVE_CLASS : ''}`}
+          >
+            <tr className={STACKED_ROW_CLASS}>
+              <td data-label="Venta" className={STACKED_TITLE_CELL_CLASS}>
+                <p>{order.reference}</p>
+                <p className="text-xs font-normal text-slate-500">
+                  {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
+                  {order.address ? ` - ${order.address}` : ''}
+                </p>
+                {formatSchedule(order) && <p className="text-xs font-normal text-slate-500">{formatSchedule(order)}</p>}
+                {formatShipping(order) && <p className="text-xs font-normal text-slate-500">{formatShipping(order)}</p>}
+              </td>
+              <td data-label="Fecha" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>{formatDateTime(order.createdAt)}</td>
+              <td data-label="Productos" className={STACKED_CELL_CLASS}>
+                <OrderItemsList items={order.items} />
+              </td>
+              <td data-label="Pago" className={STACKED_CELL_CLASS}>
+                <div className="flex flex-col items-end md:items-start">
                   <p className="mb-1 text-xs text-slate-500">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</p>
                   <span className={`${BADGE_CLASS} ${PAYMENT_STATUS_BADGES[order.paymentStatus]} mb-1`}>
                     {PAYMENT_STATUS_LABELS[order.paymentStatus]}
                   </span>
                   <StatusSelect<PaymentStatus>
-                    ariaLabel={`Estado del pago de ${order.description}`}
+                    ariaLabel={`Estado del pago de ${order.reference}`}
                     value={order.paymentStatus}
                     options={PAYMENT_STATUS_OPTIONS}
                     onChangeAction={(nextStatus) => refreshAfter(updatePaymentStatus(order.id, nextStatus))}
                   />
-                </td>
-                <td className={`${TABLE_CELL_CLASS} font-semibold`}>{formatCurrency(order.total)}</td>
-                <td className={TABLE_CELL_CLASS}>
-                  <StatusSelect<DeliveryStatus>
-                    ariaLabel={`Estado del envio de ${order.description}`}
-                    value={order.deliveryStatus}
-                    options={DELIVERY_STATUS_OPTIONS}
-                    onChangeAction={(nextStatus) => refreshAfter(updateDeliveryStatus(order.id, nextStatus))}
-                  />
-                </td>
-                <td className={TABLE_CELL_CLASS}>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className={SECONDARY_BUTTON_CLASS}
-                      onClick={() => setEditingOrderId(editingOrderId === order.id ? null : order.id)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Editar
-                    </button>
-                    <DeleteOrderButton orderId={order.id} description={order.description} />
-                  </div>
+                </div>
+              </td>
+              <td data-label="Total" className={`${STACKED_CELL_CLASS} font-semibold`}>{formatCurrency(order.total)}</td>
+              <td data-label="Envio" className={STACKED_CELL_CLASS}>
+                <StatusSelect<DeliveryStatus>
+                  ariaLabel={`Estado del envio de ${order.reference}`}
+                  value={order.deliveryStatus}
+                  options={DELIVERY_STATUS_OPTIONS}
+                  onChangeAction={(nextStatus) => refreshAfter(updateDeliveryStatus(order.id, nextStatus))}
+                />
+              </td>
+              <td data-label="Acciones" className={STACKED_CELL_CLASS}>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={SECONDARY_BUTTON_CLASS}
+                    onClick={() => setEditingOrderId(editingOrderId === order.id ? null : order.id)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </button>
+                  <DeleteOrderButton orderId={order.id} reference={order.reference} />
+                </div>
+              </td>
+            </tr>
+
+            {editingOrderId === order.id && (
+              <tr className={STACKED_EDIT_ROW_CLASS}>
+                <td colSpan={COLUMN_COUNT} className={STACKED_EDIT_CELL_CLASS}>
+                  <OrderForm products={products} order={order} onFinished={() => setEditingOrderId(null)} />
                 </td>
               </tr>
-
-              {editingOrderId === order.id && (
-                <tr>
-                  <td colSpan={COLUMN_COUNT} className="bg-slate-50 p-4">
-                    <OrderForm products={products} order={order} onFinished={() => setEditingOrderId(null)} />
-                  </td>
-                </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
+            )}
+          </tbody>
+        ))}
       </table>
     </div>
   );
 }
 
-function DeleteOrderButton({ orderId, description }: { orderId: string; description: string }) {
+function DeleteOrderButton({ orderId, reference }: { orderId: string; reference: string }) {
   const router = useRouter();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const feedback = useFeedback();
   const [isPending, startTransition] = useTransition();
 
-  const handleDelete = () => {
-    if (!window.confirm(`Eliminar la venta "${description}"? El stock reservado volvera al inventario.`)) {
+  const handleDelete = async () => {
+    const confirmed = await feedback.confirm({
+      title: 'Eliminar venta',
+      message: `Se eliminara la venta "${reference}" y su stock volvera al inventario.`,
+    });
+
+    if (!confirmed) {
       return;
     }
-
-    setErrorMessage(null);
 
     startTransition(async () => {
       const result = await deleteOrder(orderId);
 
       if (!result.success) {
-        setErrorMessage(result.error);
+        feedback.error(result.error);
         return;
       }
 
+      feedback.success(`Venta "${reference}" eliminada`);
       router.refresh();
     });
   };
 
   return (
-    <div>
-      <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isPending} onClick={handleDelete}>
-        <Trash2 className="h-4 w-4 text-rose-600" />
-        {isPending ? 'Eliminando' : 'Eliminar'}
-      </button>
-      {errorMessage && <span className="mt-1 block text-xs text-rose-600">{errorMessage}</span>}
-    </div>
+    <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isPending} onClick={handleDelete}>
+      <Trash2 className="h-4 w-4 text-rose-600" />
+      {isPending ? 'Eliminando' : 'Eliminar'}
+    </button>
   );
 }

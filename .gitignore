@@ -4,6 +4,7 @@ out
 build
 .env
 .env.local
+prisma/products-export.json
 *.log
 .DS_Store
 next-env.d.ts

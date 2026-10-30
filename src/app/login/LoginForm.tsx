@@ -1,6 +1,6 @@
 'use client';
 
-import { LogIn } from 'lucide-react';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useState, useTransition } from 'react';
 
@@ -13,6 +13,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -62,15 +63,26 @@ export function LoginForm() {
         <label className={LABEL_CLASS} htmlFor="password">
           Contrasena
         </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          placeholder="********"
-          className={INPUT_CLASS}
-        />
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            placeholder="********"
+            className={`${INPUT_CLASS} pr-10`}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+            title={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       {errorMessage && <FeedbackMessage tone="error" message={errorMessage} />}

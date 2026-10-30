@@ -1,15 +1,19 @@
 'use server';
 
-import { DeliveryStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { DeliveryMethod, DeliveryStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
+import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
+import { calculateShippingPrice } from '@/lib/shipping';
 import { InsufficientStockError, OrderNotFoundError, ValidationError } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireSession } from '@/lib/session';
 import {
-  optionalText,
+  optionalIsoDate,
+  optionalNonNegativeNumber,
+  optionalTime,
   requireEnumValue,
   requirePositiveInteger,
   requireText,
@@ -24,12 +28,26 @@ const DELIVERIES_ROUTE = '/admin/entregas';
 export interface OrderItemInput {
   productId: string;
   quantity: number;
+  /** Precio unitario de esta venta. Si no se envia se usa el pactado (al editar) o el actual del producto. */
+  unitPrice?: string | number;
+}
+
+interface ParsedOrderItem {
+  productId: string;
+  quantity: number;
+  unitPrice?: number;
 }
 
 export interface OrderInput {
-  description: string;
-  reference?: string;
+  reference: string;
+  deliveryMethod: DeliveryMethod;
   address?: string;
+  /** Fecha AAAA-MM-DD y horas HH:mm de la entrega o recogida. */
+  scheduledDate?: string;
+  scheduledFrom?: string;
+  scheduledTo?: string;
+  /** Solo aplica al envio a domicilio. El precio del envio se calcula: kilometros x tarifa por km. */
+  distanceKm?: string | number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   deliveryStatus: DeliveryStatus;
@@ -59,18 +77,22 @@ export async function getOrders(): Promise<ActionResult<OrderWithItems[]>> {
   });
 }
 
-/** Domicilios por atender (con direccion y sin entregar). Disponible para todos los roles. */
+/** Domicilios por atender (envio a domicilio sin entregar), ordenados por horario. Disponible para todos los roles. */
 export async function getDeliveries(): Promise<ActionResult<OrderWithItems[]>> {
   return executeAction('orders.getDeliveries', async (trace) => {
     await requireSession();
 
     const deliveries = await prisma.order.findMany({
       where: {
-        address: { not: null },
-        deliveryStatus: { in: [DeliveryStatus.PENDING, DeliveryStatus.IN_TRANSIT] },
+        deliveryMethod: DeliveryMethod.DELIVERY,
+        deliveryStatus: { in: OPEN_DELIVERY_STATUSES },
       },
       include: ORDER_WITH_ITEMS,
-      orderBy: { createdAt: 'asc' },
+      orderBy: [
+        { scheduledDate: { sort: 'asc', nulls: 'last' } },
+        { scheduledFrom: { sort: 'asc', nulls: 'last' } },
+        { createdAt: 'asc' },
+      ],
     });
 
     trace.addStep(`domicilios-listados:${deliveries.length}`);
@@ -93,7 +115,7 @@ export async function createOrder(input: OrderInput): Promise<ActionResult<Order
       const { orderItems, total } = await reserveStock(transaction, orderData.items);
 
       return transaction.order.create({
-        data: { ...orderData.fields, total, items: { create: orderItems } },
+        data: { ...orderData.fields, total: withShipping(total, orderData.fields.shippingPrice), items: { create: orderItems } },
         include: ORDER_WITH_ITEMS,
       });
     });
@@ -128,11 +150,16 @@ export async function updateOrder(orderId: string, input: OrderInput): Promise<A
       }
 
       await restoreStock(transaction, currentOrder.items);
-      const { orderItems, total } = await reserveStock(transaction, orderData.items);
+      const agreedPrices = new Map(currentOrder.items.map((item) => [item.productId, item.unitPrice]));
+      const { orderItems, total } = await reserveStock(transaction, orderData.items, agreedPrices);
 
       return transaction.order.update({
         where: { id: orderId },
-        data: { ...orderData.fields, total, items: { deleteMany: {}, create: orderItems } },
+        data: {
+          ...orderData.fields,
+          total: withShipping(total, orderData.fields.shippingPrice),
+          items: { deleteMany: {}, create: orderItems },
+        },
         include: ORDER_WITH_ITEMS,
       });
     });
@@ -227,11 +254,20 @@ async function ensureOrderExists(orderId: string): Promise<void> {
 }
 
 function parseOrderInput(input: OrderInput) {
+  const deliveryMethod = requireEnumValue(input.deliveryMethod, DeliveryMethod, 'tipo de entrega');
+  const isDelivery = deliveryMethod === DeliveryMethod.DELIVERY;
+  const distanceKm = isDelivery ? optionalNonNegativeNumber(input.distanceKm, 'kilometros') : null;
+
   return {
     fields: {
-      description: requireText(input.description, 'descripcion', 500),
-      reference: optionalText(input.reference, 100),
-      address: optionalText(input.address, 500),
+      reference: requireText(input.reference, 'referencia', 200),
+      deliveryMethod,
+      // La direccion solo aplica al envio; en recogida se descarta aunque llegue un valor.
+      address: isDelivery ? requireText(input.address, 'direccion', 500) : null,
+      ...parseSchedule(input),
+      distanceKm,
+      // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado a miles.
+      shippingPrice: calculateShippingPrice(distanceKm ?? 0),
       paymentMethod: requireEnumValue(input.paymentMethod, PaymentMethod, 'metodo de pago'),
       paymentStatus: requireEnumValue(input.paymentStatus, PaymentStatus, 'estado del pago'),
       deliveryStatus: requireEnumValue(input.deliveryStatus, DeliveryStatus, 'estado de envio'),
@@ -240,7 +276,36 @@ function parseOrderInput(input: OrderInput) {
   };
 }
 
-async function reserveStock(transaction: TransactionClient, requestedItems: OrderItemInput[]) {
+/** Fecha y rango horario son opcionales, pero si se informan deben ser coherentes entre si. */
+function parseSchedule(input: OrderInput) {
+  const scheduledDate = optionalIsoDate(input.scheduledDate, 'fecha de entrega');
+  const scheduledFrom = optionalTime(input.scheduledFrom, 'hora desde');
+  const scheduledTo = optionalTime(input.scheduledTo, 'hora hasta');
+
+  if ((scheduledFrom || scheduledTo) && !scheduledDate) {
+    throw new ValidationError('Indica la fecha de entrega para registrar el horario');
+  }
+
+  if (Boolean(scheduledFrom) !== Boolean(scheduledTo)) {
+    throw new ValidationError('Indica la hora desde y la hora hasta del horario');
+  }
+
+  if (scheduledFrom && scheduledTo && scheduledTo <= scheduledFrom) {
+    throw new ValidationError('La hora hasta debe ser posterior a la hora desde');
+  }
+
+  return { scheduledDate, scheduledFrom, scheduledTo };
+}
+
+/**
+ * Reserva stock y fija precios. El precio de cada linea es, en orden: el indicado en la venta, el ya pactado
+ * (al editar, para que cambiar el catalogo no altere ventas existentes) o el actual del catalogo.
+ */
+async function reserveStock(
+  transaction: TransactionClient,
+  requestedItems: ParsedOrderItem[],
+  agreedPrices: Map<string, number> = new Map(),
+) {
   const products = await transaction.product.findMany({
     where: { id: { in: requestedItems.map((item) => item.productId) } },
   });
@@ -253,7 +318,11 @@ async function reserveStock(transaction: TransactionClient, requestedItems: Orde
       throw new ValidationError('Uno de los productos seleccionados ya no existe');
     }
 
-    return { productId: product.id, quantity: item.quantity, unitPrice: product.price };
+    return {
+      productId: product.id,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice ?? agreedPrices.get(product.id) ?? product.price,
+    };
   });
 
   await consumeStock(transaction, orderItems, productsById);
@@ -290,24 +359,38 @@ async function consumeStock(
   }
 }
 
-function mergeDuplicatedItems(items: OrderItemInput[]): OrderItemInput[] {
+function mergeDuplicatedItems(items: OrderItemInput[]): ParsedOrderItem[] {
   if (!Array.isArray(items) || items.length === 0) {
     throw new ValidationError('La venta debe incluir al menos un producto');
   }
 
-  const quantityByProduct = new Map<string, number>();
+  // Un mismo producto con precios distintos se mantiene como lineas separadas.
+  const mergedItems = new Map<string, ParsedOrderItem>();
 
   for (const item of items) {
     const productId = requireText(item?.productId, 'producto');
     const quantity = requirePositiveInteger(item?.quantity, 'cantidad');
-    quantityByProduct.set(productId, (quantityByProduct.get(productId) ?? 0) + quantity);
+    const unitPrice = optionalNonNegativeNumber(item?.unitPrice, 'precio') ?? undefined;
+    const key = `${productId}|${unitPrice ?? ''}`;
+    const existingItem = mergedItems.get(key);
+
+    if (existingItem) {
+      existingItem.quantity += quantity;
+    } else {
+      mergedItems.set(key, { productId, quantity, unitPrice });
+    }
   }
 
-  return [...quantityByProduct].map(([productId, quantity]) => ({ productId, quantity }));
+  return [...mergedItems.values()];
 }
 
 function roundToCents(amount: number): number {
   return Math.round(amount * 100) / 100;
+}
+
+/** El total de la venta incluye el precio de envio escrito a mano. */
+function withShipping(itemsTotal: number, shippingPrice: number): number {
+  return roundToCents(itemsTotal + shippingPrice);
 }
 
 function revalidateSalesViews(): void {

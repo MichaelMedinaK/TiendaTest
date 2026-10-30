@@ -3,6 +3,7 @@ import { DeliveryStatus, PaymentStatus } from '@prisma/client';
 import { getOrders } from '@/actions/orders';
 import { getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { OrderItemsList } from '@/components/OrderItemsList';
 import {
   CARD_CLASS,
   TABLE_CELL_CLASS,
@@ -10,8 +11,13 @@ import {
   TABLE_HEAD_CELL_CLASS,
 } from '@/components/ui/styles';
 import { LOW_STOCK_THRESHOLD } from '@/lib/constants';
-import { formatCurrency, formatDateTime } from '@/lib/format';
-import { DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from '@/lib/labels';
+import { formatCurrency, formatDateTime, formatProductLabel, formatSchedule, formatShipping } from '@/lib/format';
+import {
+  DELIVERY_METHOD_LABELS,
+  DELIVERY_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_STATUS_LABELS,
+} from '@/lib/labels';
 
 import { PrintButton } from './PrintButton';
 
@@ -96,15 +102,14 @@ export default async function ReportPage() {
         <h2 className="text-lg font-semibold text-slate-900">Stock actual</h2>
         {lowStockProducts.length > 0 && (
           <p className="text-sm text-rose-600">
-            Stock bajo ({LOW_STOCK_THRESHOLD} o menos): {lowStockProducts.map((product) => product.name).join(', ')}
+            Stock bajo ({LOW_STOCK_THRESHOLD} o menos): {lowStockProducts.map((product) => formatProductLabel(product)).join(', ')}
           </p>
         )}
         <div className={`${CARD_CLASS} overflow-x-auto p-0`}>
           <table className={TABLE_CLASS}>
             <thead className="bg-slate-50">
               <tr>
-                <th className={TABLE_HEAD_CELL_CLASS}>Producto</th>
-                <th className={TABLE_HEAD_CELL_CLASS}>SKU</th>
+                <th className={TABLE_HEAD_CELL_CLASS}>Producto - SKU</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Precio</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Stock</th>
               </tr>
@@ -112,8 +117,7 @@ export default async function ReportPage() {
             <tbody className="divide-y divide-slate-100">
               {products.map((product) => (
                 <tr key={product.id}>
-                  <td className={TABLE_CELL_CLASS}>{product.name}</td>
-                  <td className={TABLE_CELL_CLASS}>{product.sku ?? '-'}</td>
+                  <td className={TABLE_CELL_CLASS}>{formatProductLabel(product)}</td>
                   <td className={TABLE_CELL_CLASS}>{formatCurrency(product.price)}</td>
                   <td className={TABLE_CELL_CLASS}>{product.stock}</td>
                 </tr>
@@ -130,9 +134,8 @@ export default async function ReportPage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className={TABLE_HEAD_CELL_CLASS}>Fecha</th>
-                <th className={TABLE_HEAD_CELL_CLASS}>Descripcion</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Referencia</th>
-                <th className={TABLE_HEAD_CELL_CLASS}>Direccion</th>
+                <th className={TABLE_HEAD_CELL_CLASS}>Entrega</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Pago</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Envio</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Total</th>
@@ -143,13 +146,17 @@ export default async function ReportPage() {
                 <tr key={order.id}>
                   <td className={`${TABLE_CELL_CLASS} whitespace-nowrap`}>{formatDateTime(order.createdAt)}</td>
                   <td className={TABLE_CELL_CLASS}>
-                    {order.description}
-                    <span className="block text-xs text-slate-500">
-                      {order.items.map((item) => `${item.quantity} x ${item.product.name}`).join(', ')}
-                    </span>
+                    {order.reference}
+                    <div className="mt-1 w-full max-w-md">
+                      <OrderItemsList items={order.items} />
+                    </div>
                   </td>
-                  <td className={TABLE_CELL_CLASS}>{order.reference ?? '-'}</td>
-                  <td className={TABLE_CELL_CLASS}>{order.address ?? '-'}</td>
+                  <td className={TABLE_CELL_CLASS}>
+                    {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
+                    {order.address ? ` - ${order.address}` : ''}
+                    {formatSchedule(order) && <span className="block text-xs text-slate-500">{formatSchedule(order)}</span>}
+                    {formatShipping(order) && <span className="block text-xs text-slate-500">{formatShipping(order)}</span>}
+                  </td>
                   <td className={TABLE_CELL_CLASS}>
                     {PAYMENT_METHOD_LABELS[order.paymentMethod]} - {PAYMENT_STATUS_LABELS[order.paymentStatus]}
                   </td>
@@ -159,7 +166,7 @@ export default async function ReportPage() {
               ))}
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan={7} className={`${TABLE_CELL_CLASS} text-slate-500`}>
+                  <td colSpan={6} className={`${TABLE_CELL_CLASS} text-slate-500`}>
                     Sin ventas registradas.
                   </td>
                 </tr>

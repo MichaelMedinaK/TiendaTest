@@ -1,6 +1,7 @@
 import { Store } from 'lucide-react';
 import { Suspense } from 'react';
 
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { CARD_CLASS } from '@/components/ui/styles';
 
 import { LoginForm } from './LoginForm';
@@ -8,6 +9,10 @@ import { LoginForm } from './LoginForm';
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="fixed right-4 top-4">
+        <ThemeToggle variant="floating" />
+      </div>
+
       <div className={`${CARD_CLASS} w-full max-w-sm`}>
         <div className="mb-6 text-center">
           <Store className="mx-auto mb-2 h-8 w-8 text-brand-600" />

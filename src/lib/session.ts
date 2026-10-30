@@ -16,8 +16,9 @@ import { prisma } from './prisma';
 
 export async function createSessionCookie(payload: SessionPayload): Promise<void> {
   const token = await signSessionToken(payload);
+  const cookieStore = await cookies();
 
-  cookies().set({
+  cookieStore.set({
     name: AUTH_COOKIE_NAME,
     value: token,
     httpOnly: true,
@@ -28,13 +29,15 @@ export async function createSessionCookie(payload: SessionPayload): Promise<void
   });
 }
 
-export function destroySessionCookie(): void {
-  cookies().delete(AUTH_COOKIE_NAME);
+export async function destroySessionCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(AUTH_COOKIE_NAME);
 }
 
 /** Sesion ligera basada solo en el JWT. Suficiente para pintar el layout. */
 export async function getCurrentSession(): Promise<SessionPayload | null> {
-  const token = cookies().get(AUTH_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
 
   if (!token) {
     return null;

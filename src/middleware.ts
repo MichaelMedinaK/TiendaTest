@@ -10,6 +10,12 @@ const LOGIN_PATH = '/login';
  * sin una cookie de sesion valida o a un rol sin permiso sobre ese modulo.
  */
 export async function middleware(request: NextRequest) {
+  // Las Server Actions (POST con cabecera Next-Action) validan la sesion por si mismas y devuelven un
+  // resultado con mensaje. Redirigirlas a /login haria que el cliente reciba `undefined` y falle.
+  if (request.headers.has('next-action')) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
   const { pathname } = request.nextUrl;

@@ -8,6 +8,7 @@ import type { Role } from '@prisma/client';
 
 import { createUser } from '@/actions/users';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { ROLE_LABELS, toSelectOptions } from '@/lib/labels';
 
@@ -15,6 +16,7 @@ const ROLE_OPTIONS = toSelectOptions(ROLE_LABELS);
 
 export function NewUserForm() {
   const router = useRouter();
+  const toast = useFeedback();
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -38,7 +40,7 @@ export function NewUserForm() {
       }
 
       form.reset();
-      setFeedback({ tone: 'success', message: `Usuario ${result.data.email} creado` });
+      toast.success(`Usuario ${result.data.email} creado`);
       router.refresh();
     });
   };
@@ -59,7 +61,7 @@ export function NewUserForm() {
           <label className={LABEL_CLASS} htmlFor="email">
             Usuario
           </label>
-          <input id="email" name="email" type="text" required className={INPUT_CLASS} placeholder="maria" />
+          <input id="email" name="email" type="text" required autoComplete="off" className={INPUT_CLASS} placeholder="maria" />
         </div>
 
         <div>
@@ -70,6 +72,7 @@ export function NewUserForm() {
             id="password"
             name="password"
             type="password"
+            autoComplete="new-password"
             required
             minLength={6}
             className={INPUT_CLASS}

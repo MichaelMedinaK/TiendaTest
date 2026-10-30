@@ -11,7 +11,7 @@ export class BusinessError extends Error {
 
 export class InvalidCredentialsError extends BusinessError {
   constructor() {
-    super('Correo o contrasena incorrectos');
+    super('Usuario o contrasena incorrectos');
   }
 }
 
@@ -43,7 +43,7 @@ export class IncorrectCurrentPasswordError extends BusinessError {
 }
 
 export class UnauthorizedError extends BusinessError {
-  constructor(message = 'Sesion no valida o expirada') {
+  constructor(message = 'Tu sesion expiro o ya no es valida. Cierra sesion e ingresa de nuevo') {
     super(message);
   }
 }
@@ -71,6 +71,21 @@ export class UserNotFoundError extends BusinessError {
 export class ProductNotFoundError extends BusinessError {
   constructor(productId: string) {
     super(`No se encontro el producto ${productId}`);
+  }
+}
+
+export class SkuAlreadyRegisteredError extends BusinessError {
+  constructor(sku: string) {
+    super(`Ya existe un producto con el SKU "${sku}"`);
+  }
+}
+
+export class ProductInUseError extends BusinessError {
+  constructor(productName: string, salesCount: number) {
+    super(
+      `No se puede eliminar "${productName}" porque esta en ${salesCount} venta(s) registrada(s). ` +
+        'Si ya no lo vendes, deja su stock en 0',
+    );
   }
 }
 

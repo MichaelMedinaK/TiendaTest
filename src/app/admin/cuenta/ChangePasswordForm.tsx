@@ -5,9 +5,11 @@ import { FormEvent, useState, useTransition } from 'react';
 
 import { changeOwnPassword } from '@/actions/users';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
 
 export function ChangePasswordForm() {
+  const toast = useFeedback();
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -33,7 +35,7 @@ export function ChangePasswordForm() {
       }
 
       form.reset();
-      setFeedback({ tone: 'success', message: 'Tu clave fue actualizada' });
+      toast.success('Tu clave fue actualizada');
     });
   };
 

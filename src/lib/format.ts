@@ -31,3 +31,41 @@ export function formatDateTime(date: Date): string {
 
   return `${partValue('day')}/${partValue('month')}/${partValue('year')} ${partValue('hour')}:${partValue('minute')}`;
 }
+
+/** "Producto - SKU" (o solo el nombre si no tiene SKU): forma estandar de listar productos. */
+export function formatProductLabel({ name, sku }: { name: string; sku: string | null }): string {
+  return sku ? `${name} - ${sku}` : name;
+}
+
+interface Schedule {
+  scheduledDate: Date | null;
+  scheduledFrom: string | null;
+  scheduledTo: string | null;
+}
+
+/** Solo la fecha ("29/10/26") del horario; la fecha se guarda sin zona horaria (UTC). */
+export function formatScheduleDay(scheduledDate: Date): string {
+  const isoDate = scheduledDate.toISOString();
+  return `${isoDate.slice(8, 10)}/${isoDate.slice(5, 7)}/${isoDate.slice(2, 4)}`;
+}
+
+/** Texto del horario ("29/10/26 14:00 - 16:00"), o null si la venta no tiene fecha. */
+export function formatSchedule({ scheduledDate, scheduledFrom, scheduledTo }: Schedule): string | null {
+  if (!scheduledDate) {
+    return null;
+  }
+
+  const day = formatScheduleDay(scheduledDate);
+
+  return scheduledFrom && scheduledTo ? `${day} ${scheduledFrom} - ${scheduledTo}` : day;
+}
+
+/** Texto de km y precio de envio ("12.5 km - Envio S/ 5.00"), o null si no se registro ninguno. */
+export function formatShipping({ distanceKm, shippingPrice }: { distanceKm: number | null; shippingPrice: number }): string | null {
+  const parts = [
+    distanceKm !== null ? `${distanceKm} km` : null,
+    shippingPrice > 0 ? `Envio ${formatCurrency(shippingPrice)}` : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(' - ') : null;
+}

@@ -6,10 +6,15 @@ import type { Role } from '@prisma/client';
 
 import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
-import { LOGIN_ROUTE } from '@/lib/constants';
-import { IncorrectPasswordError, InactiveUserError, UserDoesNotExistError } from '@/lib/errors';
+import { IS_PRODUCTION, LOGIN_ROUTE } from '@/lib/constants';
+import {
+  IncorrectPasswordError,
+  InactiveUserError,
+  InvalidCredentialsError,
+  UserDoesNotExistError,
+} from '@/lib/errors';
 import { toLoginInfrastructureError } from '@/lib/login-errors';
-import { verifyPassword } from '@/lib/password';
+import { DUMMY_PASSWORD_HASH, verifyPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { createSessionCookie, destroySessionCookie } from '@/lib/session';
 import { requireUsername, requireText } from '@/lib/validation';
@@ -30,6 +35,18 @@ async function findUserOrExplain(email: string) {
 }
 
 /**
+ * En produccion siempre el mismo mensaje, para no revelar si el usuario existe. En desarrollo se detalla
+ * si falla el usuario o la clave, para facilitar las pruebas.
+ */
+function invalidCredentialsError(userExists: boolean, username: string): Error {
+  if (IS_PRODUCTION) {
+    return new InvalidCredentialsError();
+  }
+
+  return userExists ? new IncorrectPasswordError() : new UserDoesNotExistError(username);
+}
+
+/**
  * Valida credenciales y emite la cookie HTTP-Only `auth_token`.
  * La redireccion se delega al cliente para no interferir con el manejo de errores.
  */
@@ -42,18 +59,16 @@ export async function login(email: string, password: string): Promise<ActionResu
 
     const user = await findUserOrExplain(normalizedEmail);
 
-    if (!user) {
-      throw new UserDoesNotExistError(normalizedEmail);
+    // Siempre se compara una clave (con un hash falso si el usuario no existe) para igualar los tiempos de respuesta.
+    const isPasswordValid = await verifyPassword(plainPassword, user?.password ?? DUMMY_PASSWORD_HASH);
+
+    if (!user || !isPasswordValid) {
+      throw invalidCredentialsError(user !== null, normalizedEmail);
     }
 
+    // El estado "desactivado" solo se revela a quien ya demostro conocer la clave.
     if (!user.isActive) {
       throw new InactiveUserError();
-    }
-
-    const isPasswordValid = await verifyPassword(plainPassword, user.password);
-
-    if (!isPasswordValid) {
-      throw new IncorrectPasswordError();
     }
 
     trace.addStep('password-verificado');
@@ -81,6 +96,6 @@ export async function login(email: string, password: string): Promise<ActionResu
 }
 
 export async function logout(): Promise<void> {
-  destroySessionCookie();
+  await destroySessionCookie();
   redirect(LOGIN_ROUTE);
 }

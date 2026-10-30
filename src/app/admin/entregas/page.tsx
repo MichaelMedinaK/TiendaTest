@@ -16,7 +16,7 @@ export default async function DeliveriesPage() {
     <section className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Entregas</h1>
-        <p className="text-sm text-slate-500">Domicilios pendientes y en camino</p>
+        <p className="text-sm text-slate-500">Domicilios nuevos, empacados y en camino</p>
       </header>
 
       <DeliveriesList deliveries={result.data} />

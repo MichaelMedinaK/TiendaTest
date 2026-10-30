@@ -58,6 +58,28 @@ Configura el correo y la clave en `.env` antes de ejecutar el seed. Sin ambos va
 - Por eso, modificar `SEED_ADMIN_PASSWORD` después del primer seed **no** cambia la clave de un usuario ya creado. Para cambiarla usa la pantalla **Mi cuenta** o el reseteo desde **Usuarios** (ver [MANUAL-DE-USO.md](./MANUAL-DE-USO.md)).
 - Para crear un administrador adicional (por ejemplo, si perdiste el acceso), pon un correo distinto en `SEED_ADMIN_EMAIL` y vuelve a ejecutar `npm run db:seed`.
 
+### Copiar el catálogo de productos a otra base (local → producción)
+
+Estas variables **solo** las lee `npm run db:copy-products`. La aplicación en ejecución no las usa.
+
+| Variable              | Obligatoria | Descripción                                            |
+| --------------------- | :---------: | ------------------------------------------------------ |
+| `SOURCE_DATABASE_URL` |     Sí      | Base de **origen** (de donde se leen los productos)    |
+| `TARGET_DATABASE_URL` |     Sí      | Base de **destino** (donde se escriben los productos)  |
+
+```bash
+npm run db:copy-products -- --dry-run   # muestra qué haría, sin escribir nada
+npm run db:copy-products                # ejecuta la copia
+```
+
+**Cómo funciona:**
+
+- Copia **solo la tabla `products`**. No toca usuarios, pedidos ni ningún otro dato del destino.
+- **Nunca borra ni desactiva nada** en el destino: solo crea lo que falta y actualiza lo que ya existe.
+- Empareja cada producto por `sku`; si el producto no tiene `sku`, lo busca por `id` y luego por nombre. Por eso se puede ejecutar varias veces sin duplicar el catálogo.
+- Conserva el `id` y la fecha de creación originales de cada producto.
+- Antes de escribir, deja una copia de respaldo en `prisma/products-export.json` (ignorado por Git).
+
 ### Presentación
 
 Estas variables llevan el prefijo `NEXT_PUBLIC_` porque también se usan en el navegador; **no pongas secretos en ellas**.

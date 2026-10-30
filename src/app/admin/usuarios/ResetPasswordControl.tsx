@@ -4,6 +4,8 @@ import { KeyRound } from 'lucide-react';
 import { FormEvent, useState, useTransition } from 'react';
 
 import { resetUserPassword } from '@/actions/users';
+import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { INPUT_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
 
 interface ResetPasswordControlProps {
@@ -13,8 +15,8 @@ interface ResetPasswordControlProps {
 
 /** Permite al ADMIN asignar una clave nueva a cualquier usuario desde la tabla. */
 export function ResetPasswordControl({ userId, userEmail }: ResetPasswordControlProps) {
+  const toast = useFeedback();
   const [isFormVisible, setIsFormVisible] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -22,7 +24,6 @@ export function ResetPasswordControl({ userId, userEmail }: ResetPasswordControl
     event.preventDefault();
     const newPassword = String(new FormData(event.currentTarget).get('newPassword') ?? '');
     setErrorMessage(null);
-    setFeedbackMessage(null);
 
     startTransition(async () => {
       const result = await resetUserPassword(userId, newPassword);
@@ -33,19 +34,16 @@ export function ResetPasswordControl({ userId, userEmail }: ResetPasswordControl
       }
 
       setIsFormVisible(false);
-      setFeedbackMessage('Clave actualizada');
+      toast.success(`Clave de ${userEmail} actualizada`);
     });
   };
 
   if (!isFormVisible) {
     return (
-      <div>
-        <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => setIsFormVisible(true)}>
-          <KeyRound className="h-4 w-4" />
-          Cambiar clave
-        </button>
-        {feedbackMessage && <span className="mt-1 block text-xs text-emerald-600">{feedbackMessage}</span>}
-      </div>
+      <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => setIsFormVisible(true)}>
+        <KeyRound className="h-4 w-4" />
+        Cambiar clave
+      </button>
     );
   }
 
@@ -57,6 +55,7 @@ export function ResetPasswordControl({ userId, userEmail }: ResetPasswordControl
         type="password"
         required
         minLength={6}
+        autoComplete="new-password"
         placeholder="Minimo 6 caracteres"
         className={`${INPUT_CLASS} w-44 py-1.5`}
       />
@@ -66,7 +65,11 @@ export function ResetPasswordControl({ userId, userEmail }: ResetPasswordControl
       <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => setIsFormVisible(false)}>
         Cancelar
       </button>
-      {errorMessage && <span className="block w-full text-xs text-rose-600">{errorMessage}</span>}
+      {errorMessage && (
+        <div className="w-full text-left">
+          <FeedbackMessage tone="error" message={errorMessage} />
+        </div>
+      )}
     </form>
   );
 }

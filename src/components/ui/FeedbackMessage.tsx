@@ -7,21 +7,25 @@ interface FeedbackMessageProps {
   message: string;
 }
 
-const TONE_STYLES: Record<FeedbackTone, string> = {
-  error: 'border-rose-200 bg-rose-50 text-rose-700',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+const TONE_STYLES: Record<FeedbackTone, { box: string; icon: string }> = {
+  error: { box: 'border-rose-500 bg-rose-50 text-rose-800', icon: 'bg-rose-100 text-rose-600' },
+  success: { box: 'border-emerald-500 bg-emerald-50 text-emerald-800', icon: 'bg-emerald-100 text-emerald-600' },
 };
 
+/** Aviso en linea (dentro de un formulario o pagina), con el mismo lenguaje visual que las notificaciones. */
 export function FeedbackMessage({ tone, message }: FeedbackMessageProps) {
   const Icon = tone === 'error' ? AlertCircle : CheckCircle2;
+  const styles = TONE_STYLES[tone];
 
   return (
-    <p
+    <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${TONE_STYLES[tone]}`}
+      className={`flex items-start gap-3 rounded-xl border-l-4 px-3 py-2.5 text-sm font-medium shadow-sm ${styles.box}`}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      {message}
-    </p>
+      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${styles.icon}`}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 break-words pt-0.5">{message}</span>
+    </div>
   );
 }

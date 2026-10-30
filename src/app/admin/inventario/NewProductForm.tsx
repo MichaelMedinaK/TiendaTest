@@ -6,10 +6,12 @@ import { FormEvent, useState, useTransition } from 'react';
 
 import { createProduct } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
 
 export function NewProductForm() {
   const router = useRouter();
+  const toast = useFeedback();
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -33,7 +35,7 @@ export function NewProductForm() {
       }
 
       form.reset();
-      setFeedback({ tone: 'success', message: `Producto "${result.data.name}" creado` });
+      toast.success(`Producto "${result.data.name}" creado`);
       router.refresh();
     });
   };

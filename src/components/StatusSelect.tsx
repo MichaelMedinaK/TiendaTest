@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 
 import type { ActionResult } from '@/lib/action-result';
 import { INPUT_CLASS } from '@/components/ui/styles';
+import { useFeedback } from '@/components/ui/FeedbackProvider';
 
 interface SelectOption<TValue extends string> {
   value: TValue;
@@ -28,26 +29,28 @@ export function StatusSelect<TValue extends string>({
   onChangeAction,
 }: StatusSelectProps<TValue>) {
   const [selectedValue, setSelectedValue] = useState<TValue>(value);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const feedback = useFeedback();
 
   const handleChange = (nextValue: TValue) => {
     const previousValue = selectedValue;
     setSelectedValue(nextValue);
-    setErrorMessage(null);
 
     startTransition(async () => {
       const result = await onChangeAction(nextValue);
 
       if (!result.success) {
         setSelectedValue(previousValue);
-        setErrorMessage(result.error);
+        feedback.error(result.error);
+        return;
       }
+
+      feedback.success('Estado actualizado');
     });
   };
 
   return (
-    <div className="min-w-[9.5rem]">
+    <div className="md:min-w-[9.5rem]">
       <select
         aria-label={ariaLabel}
         className={`${INPUT_CLASS} py-1.5`}
@@ -61,7 +64,6 @@ export function StatusSelect<TValue extends string>({
           </option>
         ))}
       </select>
-      {errorMessage && <span className="mt-1 block text-xs text-rose-600">{errorMessage}</span>}
     </div>
   );
 }

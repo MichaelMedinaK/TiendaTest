@@ -21,7 +21,8 @@ MVP fullstack para gestionar ventas, entregas (delivery), métodos de pago e inv
 ```bash
 npm install
 cp .env.example .env          # ajusta DATABASE_URL, AUTH_SECRET y SEED_ADMIN_*
-npm run db:push               # o: npm run db:migrate
+npm run db:push               # crea las tablas
+npm run db:rls                # protege la base (RLS) si usas Supabase
 npm run db:seed
 npm run dev
 ```
@@ -99,13 +100,14 @@ src/
 
 ## Scripts
 
-| Script               | Descripción                               |
-| -------------------- | ----------------------------------------- |
-| `npm run dev`        | Servidor de desarrollo                    |
-| `npm run build`      | `prisma generate` + build de producción   |
-| `npm run start`      | Servidor de producción                    |
-| `npm run typecheck`  | Verificación de tipos                     |
-| `npm run lint`       | ESLint                                    |
-| `npm run db:push`    | Sincroniza el esquema con la base de datos|
-| `npm run db:migrate` | Crea y aplica una migración               |
-| `npm run db:seed`    | Ejecuta el seed                           |
+| Script                     | Descripción                                    |
+| -------------------------- | ---------------------------------------------- |
+| `npm run dev`              | Servidor de desarrollo                         |
+| `npm run build`            | `prisma generate` + build de producción        |
+| `npm run start`            | Servidor de producción                         |
+| `npm run typecheck`        | Verificación de tipos                          |
+| `npm run lint`             | ESLint                                         |
+| `npm run db:push`          | Sincroniza el esquema con la base de datos     |
+| `npm run db:rls`           | Activa RLS y blinda la base (Supabase)         |
+| `npm run db:seed`          | Ejecuta el seed                                |
+| `npm run db:copy-products` | Copia el catálogo de productos entre dos bases |

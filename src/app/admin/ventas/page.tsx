@@ -1,6 +1,7 @@
 import { getOrders } from '@/actions/orders';
 import { getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { NEW_SALE_ANCHOR } from '@/lib/constants';
 
 import { OrderForm } from './OrderForm';
 import { OrdersTable } from './OrdersTable';
@@ -22,7 +23,9 @@ export default async function SalesPage() {
         <p className="text-sm text-slate-500">Registra, edita y elimina ventas del stock disponible</p>
       </header>
 
-      <OrderForm products={productsResult.data} />
+      <div id={NEW_SALE_ANCHOR} className="scroll-mt-36 md:scroll-mt-6">
+        <OrderForm products={productsResult.data} />
+      </div>
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">Historial de ventas</h2>

@@ -2,8 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Modo claro (valores por defecto de Tailwind). Los canales RGB permiten usar opacidades (bg-slate-900/50). */
 :root {
   color-scheme: light;
+
+  --brand-50: 238 245 255;
+  --brand-100: 217 232 255;
+  --brand-500: 37 99 235;
+  --brand-600: 29 78 216;
+  --brand-700: 30 64 175;
+
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+
+  --emerald-50: 236 253 245;
+  --emerald-100: 209 250 229;
+  --emerald-500: 16 185 129;
+  --emerald-600: 5 150 105;
+  --emerald-700: 4 120 87;
+  --emerald-800: 6 95 70;
+
+  --rose-50: 255 241 242;
+  --rose-100: 255 228 230;
+  --rose-500: 244 63 94;
+  --rose-600: 225 29 72;
+  --rose-700: 190 18 60;
+  --rose-800: 159 18 57;
+
+  --amber-100: 254 243 199;
+  --amber-800: 146 64 14;
+
+  --sky-100: 224 242 254;
+  --sky-800: 7 89 133;
+}
+
+/* Modo oscuro: fondo negro puro y tarjetas casi negras. Solo en pantalla: al imprimir siempre se usa el modo claro. */
+@media screen {
+  .dark {
+    color-scheme: dark;
+
+    --brand-50: 23 37 84;
+    --brand-100: 30 58 138;
+    --brand-500: 96 165 250;
+    --brand-600: 37 99 235;
+    --brand-700: 29 78 216;
+
+    --slate-50: 17 17 17;
+    --slate-100: 26 26 26;
+    --slate-200: 38 38 38;
+    --slate-300: 61 61 61;
+    --slate-400: 115 115 115;
+    --slate-500: 161 161 161;
+    --slate-600: 184 184 184;
+    --slate-700: 209 209 209;
+    --slate-800: 229 229 229;
+    --slate-900: 245 245 245;
+
+    --emerald-50: 6 40 28;
+    --emerald-100: 8 51 36;
+    --emerald-500: 16 185 129;
+    --emerald-600: 52 211 153;
+    --emerald-700: 110 231 183;
+    --emerald-800: 167 243 208;
+
+    --rose-50: 46 11 20;
+    --rose-100: 69 16 28;
+    --rose-500: 244 63 94;
+    --rose-600: 251 113 133;
+    --rose-700: 253 164 175;
+    --rose-800: 254 205 211;
+
+    --amber-100: 66 40 6;
+    --amber-800: 252 211 77;
+
+    --sky-100: 8 47 73;
+    --sky-800: 125 211 252;
+  }
+
+  .dark body {
+    background-color: #000;
+  }
+
+  /* Superficies (tarjetas, campos, botones secundarios, notificaciones). `text-white` se mantiene blanco. */
+  .dark .bg-white {
+    background-color: #0b0b0b;
+  }
 }
 
 body {

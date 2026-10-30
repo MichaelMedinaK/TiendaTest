@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 
+import { IS_PRODUCTION } from './constants';
 import { ServiceUnavailableError } from './errors';
 
 const DB_UNREACHABLE = 'No se pudo conectar con la base de datos. Verifica que el servidor de base de datos este encendido y accesible, e intentalo nuevamente';
@@ -19,16 +20,29 @@ const REQUEST_MESSAGES: Record<string, string> = {
   P1002: INITIALIZATION_MESSAGES.P1002,
   P1008: INITIALIZATION_MESSAGES.P1008,
   P1017: INITIALIZATION_MESSAGES.P1017,
-  P2021: 'Falta una tabla en la base de datos. Ejecuta las migraciones de Prisma (prisma migrate deploy)',
-  P2022: 'Falta una columna en la base de datos. Ejecuta las migraciones de Prisma (prisma migrate deploy)',
+  P2021: 'Falta una tabla en la base de datos. Crea el esquema con "npm run db:push" y luego "npm run db:seed"',
+  P2022: 'Falta una columna en la base de datos. Actualiza el esquema con "npm run db:push"',
   P2024: 'La base de datos esta saturada (sin conexiones disponibles). Intentalo en unos segundos',
 };
+
+const PRODUCTION_MESSAGE = 'No se pudo iniciar sesion en este momento. Intentalo nuevamente en unos minutos';
 
 /**
  * Traduce un fallo tecnico durante el inicio de sesion a un error con mensaje claro.
  * Devuelve el error original si no se reconoce, para que se registre como tecnico.
+ * En produccion el mensaje es generico (el detalle queda solo en el log del servidor).
  */
 export function toLoginInfrastructureError(error: unknown): unknown {
+  const translated = translateInfrastructureError(error);
+
+  if (IS_PRODUCTION && translated instanceof ServiceUnavailableError) {
+    return new ServiceUnavailableError(PRODUCTION_MESSAGE);
+  }
+
+  return translated;
+}
+
+function translateInfrastructureError(error: unknown): unknown {
   if (error instanceof ServiceUnavailableError) {
     return error;
   }
