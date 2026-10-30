@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutList, Package, ShoppingCart, Truck, UserCog, Users } from 'lucide-react';
+import { Boxes, LayoutList, MapPin, Package, ShoppingCart, Truck, UserCog, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -18,7 +18,9 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
   { href: '/admin/dashboard', label: 'Inicio', icon: LayoutList },
   { href: '/admin/ventas', label: 'Ventas', icon: ShoppingCart },
   { href: '/admin/entregas', label: 'Entregas', icon: Truck },
+  { href: '/admin/cotizar-envio', label: 'Cotizar envio', icon: MapPin },
   { href: '/admin/inventario', label: 'Inventario', icon: Package },
+  { href: '/admin/catalogo', label: 'Catalogo', icon: Boxes },
   { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { href: '/admin/cuenta', label: 'Mi cuenta', icon: UserCog },
 ];
