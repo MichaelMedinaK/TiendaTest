@@ -1,13 +1,13 @@
 import { redirect } from 'next/navigation';
 
-import { getAvailableCatalog, getInventoryOwners, getProducts } from '@/actions/products';
+import { getAvailableCatalog, getInventoryOwners, getManualMovements, getProducts } from '@/actions/products';
 import { OwnerSelect } from '@/components/OwnerSelect';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
 import { formatUserLabel } from '@/lib/format';
 import { getCurrentSession } from '@/lib/session';
 
-import { AddToInventoryForm } from './AddToInventoryForm';
+import { InventoryActions } from './InventoryActions';
 import { InventoryTable } from './InventoryTable';
 
 export const dynamic = 'force-dynamic';
@@ -23,10 +23,11 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   // Un tendero siempre ve su inventario; el administrador puede elegir el de cualquier usuario.
   const isAdmin = session.role === 'ADMIN';
   const ownerId = isAdmin && duenio && duenio !== 'ALL' ? duenio : session.userId;
-  const [ownersResult, productsResult, catalogResult] = await Promise.all([
+  const [ownersResult, productsResult, catalogResult, movementsResult] = await Promise.all([
     getInventoryOwners(),
     getProducts(ownerId),
     getAvailableCatalog(ownerId),
+    getManualMovements(ownerId),
   ]);
 
   if (!productsResult.success) {
@@ -39,6 +40,10 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
   if (!catalogResult.success) {
     return <FeedbackMessage tone="error" message={catalogResult.error} />;
+  }
+
+  if (!movementsResult.success) {
+    return <FeedbackMessage tone="error" message={movementsResult.error} />;
   }
 
   const owner = ownersResult.data.find((candidate) => candidate.id === ownerId);
@@ -54,7 +59,12 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
       {isAdmin && <OwnerSelect owners={ownersResult.data} value={ownerId} />}
 
-      <AddToInventoryForm ownerId={ownerId} catalog={catalogResult.data} />
+      <InventoryActions
+        ownerId={ownerId}
+        catalog={catalogResult.data}
+        products={productsResult.data}
+        movements={movementsResult.data}
+      />
       <InventoryTable products={productsResult.data} />
     </section>
   );

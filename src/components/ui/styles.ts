@@ -29,7 +29,12 @@ export const BADGE_CLASS = 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-
 export const STACKED_WRAPPER_CLASS =
   'overflow-x-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:shadow-sm';
 
-export const STACKED_TABLE_CLASS = 'block w-full text-sm md:table md:min-w-full md:divide-y md:divide-slate-200';
+const STACKED_TABLE_BASE_CLASS = 'block w-full md:table md:min-w-full md:divide-y md:divide-slate-200';
+
+export const STACKED_TABLE_CLASS = `${STACKED_TABLE_BASE_CLASS} text-sm`;
+
+/** Variante con la letra algo mas grande, para listas que se leen de un vistazo (historial de ventas). */
+export const STACKED_TABLE_LARGE_CLASS = `${STACKED_TABLE_BASE_CLASS} text-[0.9375rem]`;
 
 export const STACKED_HEAD_CLASS = 'hidden bg-slate-50 md:table-header-group';
 
@@ -41,8 +46,13 @@ export const STACKED_GROUP_ACTIVE_CLASS = 'border-brand-500 ring-2 ring-brand-50
 
 export const STACKED_ROW_CLASS = 'block py-2 md:table-row md:py-0 md:hover:bg-slate-50';
 
-export const STACKED_TITLE_CELL_CLASS =
-  '-mt-2 mb-1 block border-b border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 md:mb-0 md:mt-0 md:table-cell md:border-b-0 md:bg-transparent md:py-3 md:text-sm md:font-medium';
+const STACKED_TITLE_CELL_BASE_CLASS =
+  '-mt-2 mb-1 block border-b border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 md:mb-0 md:mt-0 md:table-cell md:border-b-0 md:bg-transparent md:py-3 md:font-medium';
+
+export const STACKED_TITLE_CELL_CLASS = `${STACKED_TITLE_CELL_BASE_CLASS} md:text-sm`;
+
+/** Celda titulo de la variante con letra mas grande (ver STACKED_TABLE_LARGE_CLASS). */
+export const STACKED_TITLE_CELL_LARGE_CLASS = `${STACKED_TITLE_CELL_BASE_CLASS} md:text-[0.9375rem]`;
 
 /** Fila extra (formulario de edicion) pegada a la tarjeta del elemento. */
 export const STACKED_EDIT_ROW_CLASS = 'block border-t border-slate-200 bg-slate-50 md:table-row';

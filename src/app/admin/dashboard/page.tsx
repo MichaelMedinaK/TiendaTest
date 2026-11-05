@@ -6,6 +6,7 @@ import { getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
 import { getCurrentSession } from '@/lib/session';
+import { readShippingRate } from '@/lib/shipping-rate';
 
 import { SalesBoard } from './SalesBoard';
 
@@ -72,7 +73,12 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         </nav>
       </header>
 
-      <SalesBoard orders={orders} products={productsResult.data} showSeller={session?.role === 'ADMIN'} />
+      <SalesBoard
+        orders={orders}
+        products={productsResult.data}
+        shippingRate={readShippingRate()}
+        showSeller={session?.role === 'ADMIN'}
+      />
     </section>
   );
 }

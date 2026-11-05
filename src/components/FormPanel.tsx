@@ -12,18 +12,11 @@ export function requestOpenFormPanel(anchorId: string): void {
   window.dispatchEvent(new CustomEvent<string>(OPEN_FORM_EVENT, { detail: anchorId }));
 }
 
-interface FormPanelProps {
-  anchorId: string;
-  /** Texto del boton cuando el formulario esta cerrado, p. ej. "Nuevo producto". */
-  label: string;
-  /** Recibe `close` para cerrar el formulario al terminar de guardar. */
-  children: (close: () => void) => ReactNode;
-}
-
-/** Formulario de alta oculto hasta que se pulsa el boton; tambien se abre con la ancla (#id) o con requestOpenFormPanel. */
-export function FormPanel({ anchorId, label, children }: FormPanelProps) {
+/** Estado abierto/cerrado de un formulario; se abre con la ancla (#id) o con requestOpenFormPanel. */
+export function useFormPanel(anchorId: string) {
   const [isOpen, setIsOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), []);
+  const toggle = useCallback(() => setIsOpen((open) => !open), []);
 
   useEffect(() => {
     const open = () => {
@@ -46,17 +39,47 @@ export function FormPanel({ anchorId, label, children }: FormPanelProps) {
     return () => window.removeEventListener(OPEN_FORM_EVENT, handleRequest);
   }, [anchorId]);
 
+  return { isOpen, close, toggle };
+}
+
+interface FormPanelButtonProps {
+  isOpen: boolean;
+  /** Texto del boton cuando el formulario esta cerrado, p. ej. "Nuevo producto". */
+  label: string;
+  /** Texto del boton cuando esta abierto; hace falta distinguirlo si hay varios botones juntos. */
+  openLabel?: string;
+  onToggle: () => void;
+}
+
+export function FormPanelButton({ isOpen, label, openLabel = 'Cerrar', onToggle }: FormPanelButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-expanded={isOpen}
+      className={isOpen ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
+      onClick={onToggle}
+    >
+      {isOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+      {isOpen ? openLabel : label}
+    </button>
+  );
+}
+
+interface FormPanelProps {
+  anchorId: string;
+  /** Texto del boton cuando el formulario esta cerrado, p. ej. "Nuevo producto". */
+  label: string;
+  /** Recibe `close` para cerrar el formulario al terminar de guardar. */
+  children: (close: () => void) => ReactNode;
+}
+
+/** Formulario de alta oculto hasta que se pulsa el boton; tambien se abre con la ancla (#id) o con requestOpenFormPanel. */
+export function FormPanel({ anchorId, label, children }: FormPanelProps) {
+  const { isOpen, close, toggle } = useFormPanel(anchorId);
+
   return (
     <div id={anchorId} className="scroll-mt-36 space-y-3 md:scroll-mt-6">
-      <button
-        type="button"
-        aria-expanded={isOpen}
-        className={isOpen ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
-        onClick={() => setIsOpen((open) => !open)}
-      >
-        {isOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-        {isOpen ? 'Cerrar' : label}
-      </button>
+      <FormPanelButton isOpen={isOpen} label={label} onToggle={toggle} />
 
       {isOpen && children(close)}
     </div>

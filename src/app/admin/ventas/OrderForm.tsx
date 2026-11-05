@@ -18,8 +18,7 @@ import {
   PRIMARY_BUTTON_CLASS,
   SECONDARY_BUTTON_CLASS,
 } from '@/components/ui/styles';
-import { DELIVERY_RATE_PER_KM } from '@/lib/constants';
-import { calculateShippingPrice } from '@/lib/shipping';
+import { calculateShippingPrice, type ShippingRate } from '@/lib/shipping';
 import { formatCurrency, formatProductLabel, formatUserLabel } from '@/lib/format';
 import {
   DELIVERY_METHOD_LABELS,
@@ -31,13 +30,17 @@ import {
 interface OrderLine {
   productId: string;
   quantity: number;
-  /** Precio unitario de esta venta, editable; como texto para poder escribirlo con comodidad. */
+  /** Precio por unidad que se cobra en esta venta; como texto para poder escribirlo con comodidad. */
   unitPrice: string;
+  /** El precio se cambio a mano: solo entonces se envia; si no, manda el que tiene el inventario. */
+  hasCustomPrice: boolean;
 }
 
 interface OrderFormProps {
   /** Productos de todos los inventarios a los que tiene acceso el usuario; se filtran por vendedor. */
   products: InventoryProduct[];
+  /** Tarifa del delivery configurada en el servidor, para mostrar el mismo total mientras se escribe. */
+  shippingRate: ShippingRate;
   /** Si se recibe, el formulario edita esa venta; si no, registra una nueva. */
   order?: OrderWithItems;
   /** Al registrar: usuarios desde cuyo inventario se puede vender (el selector aparece si hay mas de uno). */
@@ -56,9 +59,24 @@ const createEmptyLine = (products: InventoryProduct[]): OrderLine => ({
   productId: products[0]?.id ?? '',
   quantity: 1,
   unitPrice: String(products[0]?.price ?? ''),
+  hasCustomPrice: false,
 });
 
-export function OrderForm({ products, order, sellers = [], currentUserId, onFinished }: OrderFormProps) {
+/** Al editar, una linea solo queda como precio manual si no coincide con el precio actual del inventario. */
+const createLinesFromOrder = (order: OrderWithItems, products: InventoryProduct[]): OrderLine[] => {
+  const inventoryPrices = new Map(
+    products.filter((product) => product.ownerId === order.sellerId).map((product) => [product.id, product.price]),
+  );
+
+  return order.items.map((item) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    unitPrice: String(item.unitPrice),
+    hasCustomPrice: inventoryPrices.get(item.productId) !== item.unitPrice,
+  }));
+};
+
+export function OrderForm({ products, shippingRate, order, sellers = [], currentUserId, onFinished }: OrderFormProps) {
   const router = useRouter();
   const toast = useFeedback();
   const isEditing = Boolean(order);
@@ -69,13 +87,7 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
     [products, sellerId],
   );
   const [lines, setLines] = useState<OrderLine[]>(
-    order
-      ? order.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: String(item.unitPrice),
-        }))
-      : [createEmptyLine(sellerProducts)],
+    order ? createLinesFromOrder(order, products) : [createEmptyLine(sellerProducts)],
   );
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(order?.deliveryMethod ?? DEFAULT_DELIVERY_METHOD);
@@ -106,7 +118,7 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
 
   const itemsTotal = lines.reduce((accumulated, line) => accumulated + (Number(line.unitPrice) || 0) * line.quantity, 0);
   // Mismo calculo que el servidor (km x tarifa); el servidor es quien fija el valor definitivo.
-  const shippingAmount = isDelivery ? calculateShippingPrice(Number(distanceKm) || 0) : 0;
+  const shippingAmount = isDelivery ? calculateShippingPrice(Number(distanceKm) || 0, shippingRate) : 0;
   const estimatedTotal = itemsTotal + shippingAmount;
 
   const updateLine = (index: number, changes: Partial<OrderLine>) => {
@@ -155,7 +167,12 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
       deliveryStatus: isEditing ? (formData.get('deliveryStatus') as DeliveryStatus) : 'PENDING',
       items: lines
         .filter((line) => line.productId)
-        .map(({ productId, quantity, unitPrice }) => ({ productId, quantity, unitPrice })),
+        // Sin precio manual no se envia ninguno: el servidor cobra el que tiene el inventario.
+        .map(({ productId, quantity, unitPrice, hasCustomPrice }) => ({
+          productId,
+          quantity,
+          unitPrice: hasCustomPrice ? unitPrice : undefined,
+        })),
     };
 
     startTransition(async () => {
@@ -314,7 +331,8 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
           />
           {isDelivery && (
             <p className="mt-1 text-xs text-slate-500">
-              {distanceKm || 0} km x {formatCurrency(DELIVERY_RATE_PER_KM)} por km, redondeado hacia arriba
+              {distanceKm || 0} km x {formatCurrency(shippingRate.ratePerKm)} por km, redondeado hacia arriba (minimo{' '}
+              {formatCurrency(shippingRate.minPrice)})
             </p>
           )}
         </div>
@@ -447,6 +465,7 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
                   updateLine(index, {
                     productId: event.target.value,
                     unitPrice: nextProduct ? String(defaultPriceOf(nextProduct)) : '',
+                    hasCustomPrice: false,
                   });
                 }}
               >
@@ -460,9 +479,26 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
 
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[8rem] flex-1">
-                  <label className="mb-1 block text-xs font-medium text-slate-500" htmlFor={`unit-price-${index}`}>
-                    Precio unitario
-                  </label>
+                  <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-2">
+                    <label className="block text-xs font-medium text-slate-500" htmlFor={`unit-price-${index}`}>
+                      Precio unitario
+                    </label>
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-brand-600 underline"
+                      onClick={() =>
+                        updateLine(index, {
+                          hasCustomPrice: !line.hasCustomPrice,
+                          unitPrice:
+                            line.hasCustomPrice && selectedProduct
+                              ? String(defaultPriceOf(selectedProduct))
+                              : line.unitPrice,
+                        })
+                      }
+                    >
+                      {line.hasCustomPrice ? 'Usar el del inventario' : 'Cambiar precio'}
+                    </button>
+                  </div>
                   <input
                     id={`unit-price-${index}`}
                     aria-label={`Precio ${index + 1}`}
@@ -470,8 +506,9 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
                     inputMode="decimal"
                     min={0}
                     step="any"
-                    required
-                    className={INPUT_CLASS}
+                    required={line.hasCustomPrice}
+                    readOnly={!line.hasCustomPrice}
+                    className={`${INPUT_CLASS} ${line.hasCustomPrice ? '' : 'bg-slate-100'}`}
                     value={line.unitPrice}
                     onChange={(event) => updateLine(index, { unitPrice: event.target.value })}
                   />
@@ -515,13 +552,6 @@ export function OrderForm({ products, order, sellers = [], currentUserId, onFini
               {differsFromCatalog && selectedProduct && (
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
                   Precio actual del producto: {formatCurrency(selectedProduct.price)}
-                  <button
-                    type="button"
-                    className="font-semibold text-brand-600 underline"
-                    onClick={() => updateLine(index, { unitPrice: String(selectedProduct.price) })}
-                  >
-                    Usar precio actual
-                  </button>
                 </p>
               )}
             </div>

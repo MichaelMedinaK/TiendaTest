@@ -9,6 +9,7 @@ import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
 import { calculateShippingPrice } from '@/lib/shipping';
+import { readShippingRate } from '@/lib/shipping-rate';
 import { InsufficientStockError, OrderNotFoundError, ValidationError } from '@/lib/errors';
 import { applyStockChange } from '@/lib/inventory-movements';
 import { assertOwnsInventory, resolveActingOwnerId, resolveOwnerFilter } from '@/lib/inventory-scope';
@@ -369,7 +370,7 @@ function parseOrderInput(input: OrderInput) {
       ...parseSchedule(input),
       distanceKm,
       // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado hacia arriba.
-      shippingPrice: calculateShippingPrice(distanceKm ?? 0),
+      shippingPrice: calculateShippingPrice(distanceKm ?? 0, readShippingRate()),
       paymentMethod: requireEnumValue(input.paymentMethod, PaymentMethod, 'metodo de pago'),
       deliveryStatus: requireEnumValue(input.deliveryStatus, DeliveryStatus, 'estado de envio'),
     },

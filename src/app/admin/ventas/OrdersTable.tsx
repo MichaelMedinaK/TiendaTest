@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil, Trash2 } from 'lucide-react';
+import { CalendarClock, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -22,13 +22,14 @@ import {
   STACKED_GROUP_CLASS,
   STACKED_HEAD_CLASS,
   STACKED_ROW_CLASS,
-  STACKED_TABLE_CLASS,
-  STACKED_TITLE_CELL_CLASS,
+  STACKED_TABLE_LARGE_CLASS,
+  STACKED_TITLE_CELL_LARGE_CLASS,
   STACKED_WRAPPER_CLASS,
   TABLE_HEAD_CELL_CLASS,
 } from '@/components/ui/styles';
 import { formatCurrency, formatDateTime, formatSchedule, formatShipping, formatUserLabel } from '@/lib/format';
 import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
+import type { ShippingRate } from '@/lib/shipping';
 
 import { OrderForm } from './OrderForm';
 
@@ -38,10 +39,12 @@ const COLUMN_COUNT = 7;
 export function OrdersTable({
   orders,
   products,
+  shippingRate,
   showSeller = false,
 }: {
   orders: OrderWithItems[];
   products: InventoryProduct[];
+  shippingRate: ShippingRate;
   /** Muestra de que inventario salio cada venta (util para el administrador). */
   showSeller?: boolean;
 }) {
@@ -62,7 +65,7 @@ export function OrdersTable({
 
   return (
     <div className={STACKED_WRAPPER_CLASS}>
-      <table className={STACKED_TABLE_CLASS}>
+      <table className={STACKED_TABLE_LARGE_CLASS}>
         <thead className={STACKED_HEAD_CLASS}>
           <tr>
             <th className={TABLE_HEAD_CELL_CLASS}>Venta</th>
@@ -80,21 +83,33 @@ export function OrdersTable({
             className={`${STACKED_GROUP_CLASS} ${editingOrderId === order.id ? STACKED_GROUP_ACTIVE_CLASS : ''}`}
           >
             <tr className={STACKED_ROW_CLASS}>
-              <td data-label="Venta" className={STACKED_TITLE_CELL_CLASS}>
+              <td data-label="Venta" className={STACKED_TITLE_CELL_LARGE_CLASS}>
                 <p>{order.reference}</p>
                 {showSeller && (
                   <p className="text-xs font-normal text-brand-600">Vendedor: {formatUserLabel(order.seller)}</p>
                 )}
-                <p className="text-xs font-normal text-slate-500">
+                <p className="text-xs font-normal uppercase tracking-wide text-slate-500">
                   {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
-                  {order.address ? ` - ${order.address}` : ''}
                 </p>
-                {formatSchedule(order) && <p className="text-xs font-normal text-slate-500">{formatSchedule(order)}</p>}
+                {order.address && (
+                  <p className="mt-1 flex items-start gap-1.5 font-semibold">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                    <span>{order.address}</span>
+                  </p>
+                )}
+                {formatSchedule(order) && (
+                  <p className="mt-1 flex items-start gap-1.5 font-semibold">
+                    <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                    <span>{formatSchedule(order)}</span>
+                  </p>
+                )}
                 {formatShipping(order) && <p className="text-xs font-normal text-slate-500">{formatShipping(order)}</p>}
               </td>
-              <td data-label="Fecha" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>{formatDateTime(order.createdAt)}</td>
+              <td data-label="Fecha" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>
+                <span className="font-semibold text-slate-900">{formatDateTime(order.createdAt)}</span>
+              </td>
               <td data-label="Productos" className={STACKED_CELL_CLASS}>
-                <OrderItemsList items={order.items} />
+                <OrderItemsList items={order.items} className="text-[0.8125rem]" />
               </td>
               <td data-label="Pago" className={STACKED_CELL_CLASS}>
                 <div className="flex flex-col items-end gap-1 md:items-start">
@@ -141,7 +156,12 @@ export function OrdersTable({
             {editingOrderId === order.id && (
               <tr className={STACKED_EDIT_ROW_CLASS}>
                 <td colSpan={COLUMN_COUNT} className={STACKED_EDIT_CELL_CLASS}>
-                  <OrderForm products={products} order={order} onFinished={() => setEditingOrderId(null)} />
+                  <OrderForm
+                    products={products}
+                    shippingRate={shippingRate}
+                    order={order}
+                    onFinished={() => setEditingOrderId(null)}
+                  />
                 </td>
               </tr>
             )}

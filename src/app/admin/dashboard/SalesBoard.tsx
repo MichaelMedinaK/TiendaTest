@@ -16,6 +16,7 @@ import { CARD_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/comp
 import { NEW_SALE_ANCHOR } from '@/lib/constants';
 import { formatCurrency, formatSchedule, formatScheduleDay, formatShipping, formatUserLabel } from '@/lib/format';
 import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
+import type { ShippingRate } from '@/lib/shipping';
 
 import { OrderForm } from '../ventas/OrderForm';
 
@@ -50,10 +51,12 @@ function groupByScheduledDay(orders: OrderWithItems[]): OrderGroup[] {
 export function SalesBoard({
   orders,
   products,
+  shippingRate,
   showSeller = false,
 }: {
   orders: OrderWithItems[];
   products: InventoryProduct[];
+  shippingRate: ShippingRate;
   showSeller?: boolean;
 }) {
   const router = useRouter();
@@ -87,7 +90,12 @@ export function SalesBoard({
             {group.orders.map((order) =>
               editingOrderId === order.id ? (
                 <div key={order.id} className="md:col-span-2 xl:col-span-3">
-                  <OrderForm products={products} order={order} onFinished={() => setEditingOrderId(null)} />
+                  <OrderForm
+                    products={products}
+                    shippingRate={shippingRate}
+                    order={order}
+                    onFinished={() => setEditingOrderId(null)}
+                  />
                 </div>
               ) : (
               <article key={order.id} className={`${CARD_CLASS} space-y-3`}>

@@ -10,6 +10,7 @@ import { createUser } from '@/actions/users';
 import { FormPanel } from '@/components/FormPanel';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { NEW_USER_ANCHOR } from '@/lib/constants';
 import { ROLE_LABELS, toSelectOptions } from '@/lib/labels';
@@ -71,7 +72,7 @@ function UserForm({ onDone }: { onDone: () => void }) {
 
         <div>
           <label className={LABEL_CLASS} htmlFor="email">
-            Usuario
+            Usuario para ingresar
           </label>
           <input id="email" name="email" type="text" required autoComplete="off" className={INPUT_CLASS} placeholder="maria" />
         </div>
@@ -80,14 +81,12 @@ function UserForm({ onDone }: { onDone: () => void }) {
           <label className={LABEL_CLASS} htmlFor="password">
             Contrasena
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={6}
-            className={INPUT_CLASS}
             placeholder="Minimo 6 caracteres"
           />
         </div>

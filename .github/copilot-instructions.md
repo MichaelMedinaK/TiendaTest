@@ -32,9 +32,10 @@ Sí puedes ejecutar libremente contra bases **locales o temporales** (por ejempl
 - **No hay migraciones versionadas.** El flujo es `prisma db push`; no existe `prisma/migrations/` y no debe introducirse `prisma migrate dev` sin acordarlo: con el esquema creado por `db push`, Prisma detecta drift y ofrece **resetear la base**.
 - **Después de cada `db push` que cree tablas, hay que ejecutar `npm run db:rls`.** [prisma/enable-rls.sql](../prisma/enable-rls.sql) activa RLS sin políticas y le quita permisos a los roles `anon` y `authenticated` de Supabase, de modo que la API pública no puede leer ni escribir nada. La aplicación no se ve afectada porque se conecta como `postgres`.
 - En Supabase se usa el **pooler de sesión (puerto 5432)** para `db push`; el de transacciones (6543) no sirve para DDL.
-- Modelos: `User`, `Product`, `InventoryItem`, `InventoryMovement`, `Order`, `OrderItem`, `Payment` (mapeados a `users`, `products`, `inventory_items`, `inventory_movements`, `orders`, `order_items`, `payments`). Roles: `ADMIN`, `STAFF`, `RESELLER`, `COURIER`.
+- Modelos: `User`, `Product`, `InventoryItem`, `InventoryMovement`, `Order`, `OrderItem`, `Payment`, `ChatMessage` (mapeados a `users`, `products`, `inventory_items`, `inventory_movements`, `orders`, `order_items`, `payments`, `chat_messages`). Roles: `ADMIN`, `STAFF`, `RESELLER`, `COURIER`.
 - **Cobros**: una venta se cobra con uno o varios `Payment` (importe, método, quién lo recibió). `Order.paymentStatus` (Pendiente, Parcial, Pagado) se calcula con `refreshPaymentStatus` de [src/lib/payments.ts](../src/lib/payments.ts); nunca se edita a mano. Un cobro no se borra: se anula con motivo.
 - **Catálogo + inventario por usuario**: `Product` es el catálogo general (nombre y SKU, lo administra el ADMIN). Cada usuario tiene `InventoryItem` por producto con su `stock`, `costPrice` (precio real) y `price` (venta). El stock solo cambia por `InventoryMovement` (entrada, salida, venta, devolución) con motivo obligatorio, vía `applyStockChange` de [src/lib/inventory-movements.ts](../src/lib/inventory-movements.ts). Cada `Order` tiene un `sellerId` y `OrderItem.unitCost` guarda el costo al vender; un pedido cancelado devuelve su stock. El alcance por rol se resuelve en [src/lib/inventory-scope.ts](../src/lib/inventory-scope.ts).
+- **Chat temporal**: `ChatMessage` es un mensaje 1 a 1 entre usuarios activos (acciones en [src/actions/chat.ts](../src/actions/chat.ts)). Dura `CHAT_MESSAGE_TTL_HOURS` ([src/lib/constants.ts](../src/lib/constants.ts)): las lecturas lo ocultan y los borra al consultar o enviar, sin tarea programada. El cliente consulta por polling (no Realtime de Supabase: RLS bloquea la API publica).
 - Usa siempre la instancia compartida de [src/lib/prisma.ts](../src/lib/prisma.ts); no instancies `PrismaClient` en código de la aplicación.
 
 ## Convenciones de código
@@ -44,7 +45,7 @@ Sí puedes ejecutar libremente contra bases **locales o temporales** (por ejempl
 - **Autorización**: el acceso por rol se decide en [src/lib/permissions.ts](../src/lib/permissions.ts) y lo aplica [src/middleware.ts](../src/middleware.ts) en el borde. Las Server Actions revalidan con `requireSession()` / `requireRole()` de [src/lib/session.ts](../src/lib/session.ts), porque el JWT puede estar desactualizado.
 - **Sesión**: JWT propio firmado con `jose` (`AUTH_SECRET`) en cookie httpOnly; contraseñas con `bcryptjs`. No hay NextAuth.
 - **Idioma**: la interfaz, los mensajes y la documentación van en español. Los comentarios y literales del código se escriben **sin tildes ni eñes** (`demostracion`, `duenio`); la documentación en Markdown sí las usa.
-- **Rutas**: en español bajo `/admin` (`ventas`, `inventario`, `entregas`, `reporte`, `usuarios`, `cuenta`, `dashboard`).
+- **Rutas**: en español bajo `/admin` (`ventas`, `inventario`, `entregas`, `chat`, `reporte`, `usuarios`, `cuenta`, `dashboard`).
 - Comenta solo lo que necesita aclaración (el porqué, no el qué).
 
 ## Variables de entorno

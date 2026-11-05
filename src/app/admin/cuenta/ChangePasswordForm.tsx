@@ -6,7 +6,8 @@ import { FormEvent, useState, useTransition } from 'react';
 import { changeOwnPassword } from '@/actions/users';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
-import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
+import { PasswordInput } from '@/components/ui/PasswordInput';
+import { CARD_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
 
 export function ChangePasswordForm() {
   const toast = useFeedback();
@@ -47,20 +48,19 @@ export function ChangePasswordForm() {
         <label className={LABEL_CLASS} htmlFor="currentPassword">
           Clave actual
         </label>
-        <input id="currentPassword" name="currentPassword" type="password" required className={INPUT_CLASS} />
+        <PasswordInput id="currentPassword" name="currentPassword" autoComplete="current-password" required />
       </div>
 
       <div>
         <label className={LABEL_CLASS} htmlFor="newPassword">
           Clave nueva
         </label>
-        <input
+        <PasswordInput
           id="newPassword"
           name="newPassword"
-          type="password"
+          autoComplete="new-password"
           required
           minLength={6}
-          className={INPUT_CLASS}
           placeholder="Minimo 6 caracteres"
         />
       </div>
@@ -69,14 +69,7 @@ export function ChangePasswordForm() {
         <label className={LABEL_CLASS} htmlFor="confirmPassword">
           Confirmar clave nueva
         </label>
-        <input
-          id="confirmPassword"
-          name="confirmPassword"
-          type="password"
-          required
-          minLength={6}
-          className={INPUT_CLASS}
-        />
+        <PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" required minLength={6} />
       </div>
 
       {feedback && <FeedbackMessage tone={feedback.tone} message={feedback.message} />}

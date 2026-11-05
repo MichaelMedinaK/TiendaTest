@@ -62,6 +62,8 @@ model User {
   orders             Order[]
   paymentsReceived   Payment[]           @relation("PaymentReceivedBy")
   paymentsVoided     Payment[]           @relation("PaymentVoidedBy")
+  chatSent           ChatMessage[]       @relation("ChatSent")
+  chatReceived       ChatMessage[]       @relation("ChatReceived")
 
   @@map("users")
 }
@@ -179,4 +181,21 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+// Mensaje de chat entre dos usuarios. Es temporal: la aplicacion no lo muestra pasado CHAT_MESSAGE_TTL_HOURS y lo borra.
+model ChatMessage {
+  id          String    @id @default(uuid())
+  senderId    String
+  recipientId String
+  body        String
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+  sender      User      @relation("ChatSent", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User      @relation("ChatReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([recipientId, readAt])
+  @@index([senderId, recipientId])
+  @@map("chat_messages")
 }

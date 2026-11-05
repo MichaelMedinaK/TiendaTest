@@ -6,7 +6,8 @@ import { FormEvent, useState, useTransition } from 'react';
 import { resetUserPassword } from '@/actions/users';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
-import { INPUT_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
+import { PasswordInput } from '@/components/ui/PasswordInput';
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
 
 interface ResetPasswordControlProps {
   userId: string;
@@ -49,15 +50,15 @@ export function ResetPasswordControl({ userId, userEmail }: ResetPasswordControl
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
-      <input
+      <PasswordInput
         aria-label={`Nueva clave de ${userEmail}`}
         name="newPassword"
-        type="password"
         required
         minLength={6}
         autoComplete="new-password"
         placeholder="Minimo 6 caracteres"
-        className={`${INPUT_CLASS} w-44 py-1.5`}
+        wrapperClassName="w-48"
+        className="py-1.5"
       />
       <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
         {isPending ? 'Guardando...' : 'Guardar'}

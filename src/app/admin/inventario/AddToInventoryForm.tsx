@@ -5,28 +5,19 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useTransition } from 'react';
 
 import { type CatalogOption, addToInventory } from '@/actions/products';
-import { FormPanel } from '@/components/FormPanel';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
-import { NEW_PRODUCT_ANCHOR } from '@/lib/constants';
 import { formatProductLabel } from '@/lib/format';
 
 interface AddToInventoryFormProps {
   ownerId: string;
   /** Productos del catalogo que todavia no estan en este inventario. */
   catalog: CatalogOption[];
+  onDone: () => void;
 }
 
-export function AddToInventoryForm({ ownerId, catalog }: AddToInventoryFormProps) {
-  return (
-    <FormPanel anchorId={NEW_PRODUCT_ANCHOR} label="Agregar al inventario">
-      {(close) => <InventoryForm ownerId={ownerId} catalog={catalog} onDone={close} />}
-    </FormPanel>
-  );
-}
-
-function InventoryForm({ ownerId, catalog, onDone }: AddToInventoryFormProps & { onDone: () => void }) {
+export function AddToInventoryForm({ ownerId, catalog, onDone }: AddToInventoryFormProps) {
   const router = useRouter();
   const toast = useFeedback();
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);

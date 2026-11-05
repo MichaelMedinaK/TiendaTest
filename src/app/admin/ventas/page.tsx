@@ -5,6 +5,7 @@ import { getInventoryOwners, getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
 import { getCurrentSession } from '@/lib/session';
+import { readShippingRate } from '@/lib/shipping-rate';
 
 import { NewSalePanel } from './NewSalePanel';
 import { OrdersTable } from './OrdersTable';
@@ -30,6 +31,8 @@ export default async function SalesPage() {
     return <FeedbackMessage tone="error" message={(failure as { error: string }).error} />;
   }
 
+  const shippingRate = readShippingRate();
+
   return (
     <section className="space-y-6">
       <header>
@@ -37,13 +40,19 @@ export default async function SalesPage() {
         <p className="text-sm text-slate-500">Registra, edita y elimina ventas del stock disponible</p>
       </header>
 
-      <NewSalePanel products={productsResult.data} sellers={ownersResult.data} currentUserId={session.userId} />
+      <NewSalePanel
+        products={productsResult.data}
+        shippingRate={shippingRate}
+        sellers={ownersResult.data}
+        currentUserId={session.userId}
+      />
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">Historial de ventas</h2>
         <OrdersTable
           orders={ordersResult.data}
           products={productsResult.data}
+          shippingRate={shippingRate}
           showSeller={session.role === 'ADMIN'}
         />
       </div>

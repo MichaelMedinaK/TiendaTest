@@ -24,7 +24,7 @@ import { ROLE_LABELS } from '@/lib/labels';
 
 import { ResetPasswordControl } from './ResetPasswordControl';
 
-export function UsersTable({ users }: { users: UserSummary[] }) {
+export function UsersTable({ users, currentUserId }: { users: UserSummary[]; currentUserId: string | null }) {
   if (users.length === 0) {
     return <div className={`${CARD_CLASS} text-sm text-slate-500`}>No hay usuarios registrados.</div>;
   }
@@ -43,14 +43,14 @@ export function UsersTable({ users }: { users: UserSummary[] }) {
           </tr>
         </thead>
         {users.map((user) => (
-          <UserRow key={user.id} user={user} />
+          <UserRow key={user.id} user={user} isCurrentUser={user.id === currentUserId} />
         ))}
       </table>
     </div>
   );
 }
 
-function UserRow({ user }: { user: UserSummary }) {
+function UserRow({ user, isCurrentUser }: { user: UserSummary; isCurrentUser: boolean }) {
   const router = useRouter();
   const feedback = useFeedback();
   const [isPending, startTransition] = useTransition();
@@ -99,8 +99,13 @@ function UserRow({ user }: { user: UserSummary }) {
     <tbody className={STACKED_GROUP_CLASS}>
       <tr className={STACKED_ROW_CLASS}>
         <td data-label="Usuario" className={STACKED_TITLE_CELL_CLASS}>
-          <p>{user.name ?? 'Sin nombre'}</p>
-          <p className="text-xs font-normal text-slate-500">{user.email}</p>
+          <p className="flex flex-wrap items-center gap-2">
+            {user.name ?? 'Sin nombre'}
+            {isCurrentUser && <span className={`${BADGE_CLASS} bg-brand-100 text-brand-700`}>Tu</span>}
+          </p>
+          <p className="text-xs font-normal text-slate-500">
+            Usuario para ingresar: <span className="font-semibold text-slate-800">{user.email}</span>
+          </p>
         </td>
         <td data-label="Rol" className={STACKED_CELL_CLASS}>
           {ROLE_LABELS[user.role]}

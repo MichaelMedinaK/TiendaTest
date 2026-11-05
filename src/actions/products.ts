@@ -90,6 +90,12 @@ export interface MovementView {
   createdAt: Date;
 }
 
+/** Movimiento manual (entrada o salida que no viene de una venta), con el producto al que afecta. */
+export interface ManualMovementView extends MovementView {
+  productName: string;
+  productSku: string | null;
+}
+
 const ITEM_WITH_PRODUCT = { product: { select: { id: true, name: true, sku: true } } } satisfies Prisma.InventoryItemInclude;
 type ItemWithProduct = Prisma.InventoryItemGetPayload<{ include: typeof ITEM_WITH_PRODUCT }>;
 
@@ -387,6 +393,43 @@ export async function getMovements(inventoryItemId: string): Promise<ActionResul
       reason: movement.reason,
       userName: movement.user.name ?? movement.user.email,
       createdAt: movement.createdAt,
+    }));
+  });
+}
+
+/**
+ * Ultimas entradas y salidas manuales de un inventario (las que no vienen de una venta), de la mas reciente a la
+ * mas antigua. Sin parametro: el propio; el administrador puede pedir el de otro usuario o `ALL`.
+ */
+export async function getManualMovements(owner?: string): Promise<ActionResult<ManualMovementView[]>> {
+  return executeAction('products.getManualMovements', async (trace) => {
+    const session = await requireRole(...INVENTORY_ROLES);
+
+    const movements = await prisma.inventoryMovement.findMany({
+      where: {
+        type: { in: ['ENTRY', 'EXIT'] },
+        orderId: null,
+        inventoryItem: resolveOwnerFilter(session, owner, false),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        user: { select: { name: true, email: true } },
+        inventoryItem: { select: { product: { select: { name: true, sku: true } } } },
+      },
+    });
+    trace.addStep(`movimientos-manuales:${movements.length}`);
+
+    return movements.map((movement) => ({
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      stockAfter: movement.stockAfter,
+      reason: movement.reason,
+      userName: movement.user.name ?? movement.user.email,
+      createdAt: movement.createdAt,
+      productName: movement.inventoryItem.product.name,
+      productSku: movement.inventoryItem.product.sku,
     }));
   });
 }

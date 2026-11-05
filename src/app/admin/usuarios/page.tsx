@@ -1,5 +1,6 @@
 import { getUsers } from '@/actions/users';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
+import { getCurrentSession } from '@/lib/session';
 
 import { NewUserForm } from './NewUserForm';
 import { UsersTable } from './UsersTable';
@@ -7,7 +8,7 @@ import { UsersTable } from './UsersTable';
 export const dynamic = 'force-dynamic';
 
 export default async function UsersPage() {
-  const result = await getUsers();
+  const [result, session] = await Promise.all([getUsers(), getCurrentSession()]);
 
   // Un usuario que no es ADMIN recibe aqui el error de permisos de la Server Action.
   if (!result.success) {
@@ -22,7 +23,7 @@ export default async function UsersPage() {
       </header>
 
       <NewUserForm />
-      <UsersTable users={result.data} />
+      <UsersTable users={result.data} currentUserId={session?.userId ?? null} />
     </section>
   );
 }

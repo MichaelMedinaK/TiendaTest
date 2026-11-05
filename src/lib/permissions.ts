@@ -2,6 +2,7 @@
 import type { Role } from '@prisma/client';
 
 export const DELIVERIES_ROUTE = '/admin/entregas';
+export const CHAT_ROUTE = '/admin/chat';
 
 const ALL_ROUTES = [
   '/admin/dashboard',
@@ -11,18 +12,19 @@ const ALL_ROUTES = [
   '/admin/reporte',
   '/admin/cotizar-envio',
   DELIVERIES_ROUTE,
+  CHAT_ROUTE,
   '/admin/usuarios',
   '/admin/cuenta',
 ];
 
 const ADMIN_ONLY_ROUTES = ['/admin/usuarios', '/admin/catalogo'];
 
-/** Rutas del panel permitidas por rol. ADMIN ve todo; TENDERO y REVENDEDOR todo salvo usuarios y catalogo; DOMICILIARIO solo entregas. */
+/** Rutas del panel permitidas por rol. ADMIN ve todo; TENDERO y REVENDEDOR todo salvo usuarios y catalogo; DOMICILIARIO solo entregas, chat y su cuenta. */
 export const ROLE_ROUTES: Record<Role, string[]> = {
   ADMIN: ALL_ROUTES,
   STAFF: ALL_ROUTES.filter((route) => !ADMIN_ONLY_ROUTES.includes(route)),
   RESELLER: ALL_ROUTES.filter((route) => !ADMIN_ONLY_ROUTES.includes(route)),
-  COURIER: [DELIVERIES_ROUTE, '/admin/cuenta'],
+  COURIER: [DELIVERIES_ROUTE, CHAT_ROUTE, '/admin/cuenta'],
 };
 
 export const ROLE_HOME_ROUTE: Record<Role, string> = {

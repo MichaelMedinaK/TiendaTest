@@ -13,9 +13,6 @@ export const DASHBOARD_ROUTE = '/admin/dashboard';
 /** En produccion los mensajes de error no revelan detalles internos (usuarios, variables, base de datos). */
 export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-/** Tarifa del delivery por kilometro; el precio del envio es kilometros x tarifa. Configurable con NEXT_PUBLIC_DELIVERY_RATE_PER_KM. */
-export const DELIVERY_RATE_PER_KM = Number(process.env.NEXT_PUBLIC_DELIVERY_RATE_PER_KM) || 1700;
-
 /** El precio del delivery siempre sube al siguiente multiplo de este valor (1 = a la unidad entera; ver calculateShippingPrice). */
 export const SHIPPING_ROUNDING_STEP = 1;
 
@@ -24,4 +21,11 @@ export const NEW_SALE_ANCHOR = 'nueva-venta';
 
 /** Anclas de los formularios de alta de inventario y usuarios; las usa el acceso rapido "+ Nuevo ...". */
 export const NEW_PRODUCT_ANCHOR = 'nuevo-producto';
+export const NEW_MOVEMENT_ANCHOR = 'entrada-salida';
 export const NEW_USER_ANCHOR = 'nuevo-usuario';
+
+/** Los mensajes del chat dejan de verse y se borran pasado este tiempo. */
+export const CHAT_MESSAGE_TTL_HOURS = 72;
+
+/** Evento del navegador que avisa que se leyeron mensajes, para actualizar el contador del menu. */
+export const CHAT_READ_EVENT = 'chat-read';

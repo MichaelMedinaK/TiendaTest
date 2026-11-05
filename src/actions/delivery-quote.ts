@@ -2,11 +2,11 @@
 
 import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
-import { DELIVERY_RATE_PER_KM } from '@/lib/constants';
 import { ServiceUnavailableError, ValidationError } from '@/lib/errors';
 import { INVENTORY_ROLES } from '@/lib/permissions';
 import { requireRole } from '@/lib/session';
 import { calculateShippingPrice } from '@/lib/shipping';
+import { readShippingRate } from '@/lib/shipping-rate';
 import { requireText } from '@/lib/validation';
 
 // Nominatim (geocodificacion) y OSRM (rutas) son servicios publicos de OpenStreetMap sin clave de API.
@@ -26,6 +26,8 @@ export interface DeliveryQuote {
   distanceKm: number;
   price: number;
   ratePerKm: number;
+  /** Piso del precio: por debajo de este valor siempre se cobra el minimo. */
+  minPrice: number;
   /** Direccion tal como la resolvio el buscador, para confirmar que ubico el lugar correcto. */
   destination: string;
   originLabel: string;
@@ -45,10 +47,13 @@ export async function quoteDelivery(address: string): Promise<ActionResult<Deliv
     const distanceKm = await drivingDistanceKm(origin, destination.coordinates);
     trace.addStep(`distancia-calculada:${distanceKm}km`);
 
+    const shippingRate = readShippingRate();
+
     return {
       distanceKm,
-      price: calculateShippingPrice(distanceKm),
-      ratePerKm: DELIVERY_RATE_PER_KM,
+      price: calculateShippingPrice(distanceKm, shippingRate),
+      ratePerKm: shippingRate.ratePerKm,
+      minPrice: shippingRate.minPrice,
       destination: destination.displayName,
       originLabel,
     };
