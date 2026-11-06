@@ -220,7 +220,7 @@ function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={`${PRIMARY_BUTTON_CLASS} bg-rose-600 hover:bg-rose-700`}
+            className={`${PRIMARY_BUTTON_CLASS} !bg-none bg-rose-600 hover:bg-rose-700`}
             onClick={() => onSettle(true)}
           >
             {options.confirmLabel ?? 'Eliminar'}

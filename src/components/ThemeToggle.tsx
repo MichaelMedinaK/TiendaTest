@@ -10,9 +10,9 @@ type ThemeToggleVariant = 'sidebar' | 'on-dark' | 'floating';
 
 const VARIANT_STYLES: Record<ThemeToggleVariant, string> = {
   sidebar: `${SECONDARY_BUTTON_CLASS} w-full`,
-  'on-dark': 'rounded-lg p-2 text-white transition hover:bg-neutral-800',
+  'on-dark': 'rounded-lg p-2 text-white transition hover:bg-white/15',
   floating:
-    'rounded-full border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:bg-slate-50',
+    'rounded-full border border-brand-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:border-pink-300 hover:bg-pink-50',
 };
 
 /**

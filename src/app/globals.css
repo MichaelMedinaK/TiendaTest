@@ -17,6 +17,17 @@
   --brand-800: 30 58 138;
   --brand-900: 23 37 84;
 
+  --pink-50: 253 242 248;
+  --pink-100: 252 231 243;
+  --pink-200: 251 207 232;
+  --pink-300: 249 168 212;
+  --pink-400: 244 114 182;
+  --pink-500: 236 72 153;
+  --pink-600: 219 39 119;
+  --pink-700: 190 24 93;
+  --pink-800: 157 23 77;
+  --pink-900: 131 24 67;
+
   --slate-50: 248 250 252;
   --slate-100: 241 245 249;
   --slate-200: 226 232 240;
@@ -65,6 +76,18 @@
     --brand-800: 147 197 253;
     --brand-900: 191 219 254;
 
+    /* 500 y 600 no cambian: son los extremos de los degradados con texto blanco. */
+    --pink-50: 46 12 32;
+    --pink-100: 74 16 50;
+    --pink-200: 112 20 72;
+    --pink-300: 157 23 77;
+    --pink-400: 244 114 182;
+    --pink-500: 236 72 153;
+    --pink-600: 219 39 119;
+    --pink-700: 249 168 212;
+    --pink-800: 251 207 232;
+    --pink-900: 252 231 243;
+
     --slate-50: 17 17 17;
     --slate-100: 26 26 26;
     --slate-200: 38 38 38;
@@ -99,6 +122,7 @@
 
   .dark body {
     background-color: #000;
+    background-image: none;
   }
 
   /* Superficies (tarjetas, campos, botones secundarios, notificaciones). `text-white` se mantiene blanco. */
@@ -109,4 +133,6 @@
 
 body {
   @apply bg-slate-100 text-slate-800 antialiased;
+  background-image: linear-gradient(135deg, rgb(var(--brand-100)), rgb(var(--pink-100)));
+  background-attachment: fixed;
 }

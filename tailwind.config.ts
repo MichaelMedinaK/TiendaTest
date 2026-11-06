@@ -33,6 +33,7 @@ const config: Config = {
       },
       colors: {
         brand: themed([50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 'brand'),
+        pink: themed([50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 'pink'),
         slate: themed([50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 'slate'),
         emerald: themed([50, 100, 500, 600, 700, 800], 'emerald'),
         rose: themed([50, 100, 500, 600, 700, 800], 'rose'),

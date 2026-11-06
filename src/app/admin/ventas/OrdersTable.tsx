@@ -88,10 +88,10 @@ export function OrdersTable({
               <td data-label="Venta" className={`${STACKED_TITLE_CELL_LARGE_CLASS} md:w-[32%] md:min-w-[15rem]`}>
                 <p>{order.reference}</p>
                 {showSeller && (
-                  <p className="text-xs font-normal text-brand-600">Vendedor: {formatUserLabel(order.seller)}</p>
+                  <p className="text-xs font-normal text-pink-600">Vendedor: {formatUserLabel(order.seller)}</p>
                 )}
                 <p className="mb-2 mt-1">
-                  <span className={`${BADGE_CLASS} bg-brand-100 uppercase tracking-wide text-brand-800`}>
+                  <span className={`${BADGE_CLASS} bg-pink-100 uppercase tracking-wide text-pink-700`}>
                     {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
                   </span>
                 </p>

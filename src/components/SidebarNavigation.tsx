@@ -36,8 +36,18 @@ interface SidebarNavigationProps {
 }
 
 const LINK_STYLES = {
-  sidebar: { base: 'gap-3 py-2', active: 'bg-brand-600 text-white', inactive: 'text-slate-600 hover:bg-slate-100' },
-  menu: { base: 'gap-3 py-3', active: 'bg-white text-black', inactive: 'text-neutral-100 hover:bg-neutral-800' },
+  sidebar: {
+    base: 'gap-3 py-2',
+    active: 'bg-gradient-to-r from-brand-600 to-pink-500 text-white shadow-sm',
+    inactive: 'text-slate-600 hover:bg-pink-100/70 hover:text-pink-700',
+    inactiveIcon: 'text-brand-500',
+  },
+  menu: {
+    base: 'gap-3 py-3',
+    active: 'bg-white/95 text-blue-900',
+    inactive: 'text-white hover:bg-white/15',
+    inactiveIcon: 'text-white/80',
+  },
 };
 
 export function SidebarNavigation({ role, variant = 'sidebar', onNavigate }: SidebarNavigationProps) {
@@ -60,7 +70,7 @@ export function SidebarNavigation({ role, variant = 'sidebar', onNavigate }: Sid
               isActive ? styles.active : styles.inactive
             }`}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className={`h-4 w-4 ${isActive ? '' : styles.inactiveIcon}`} />
             {label}
             {href === CHAT_ROUTE && unreadChatCount > 0 && (
               <span className="ml-auto rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">

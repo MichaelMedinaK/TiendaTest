@@ -29,7 +29,7 @@ export function MobileMenu({ role, userName, roleLabel, homeHref }: MobileMenuPr
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-neutral-800 bg-black text-white md:hidden print:hidden">
+    <header className="sticky top-0 z-30 border-b border-white/20 bg-gradient-to-r from-brand-700 to-pink-600 text-white shadow-md md:hidden print:hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <Link
           href={homeHref}
@@ -40,7 +40,7 @@ export function MobileMenu({ role, userName, roleLabel, homeHref }: MobileMenuPr
           <Store className="h-6 w-6 shrink-0" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold">Tienda Test</p>
-            <p className="truncate text-xs text-neutral-300">{userName}</p>
+            <p className="truncate text-xs text-white/80">{userName}</p>
           </div>
         </Link>
 
@@ -51,7 +51,7 @@ export function MobileMenu({ role, userName, roleLabel, homeHref }: MobileMenuPr
             aria-label={isOpen ? 'Cerrar menu' : 'Abrir menu'}
             aria-expanded={isOpen}
             onClick={() => setIsOpen((open) => !open)}
-            className="rounded-lg p-2 text-white transition hover:bg-neutral-800"
+            className="rounded-lg p-2 text-white transition hover:bg-white/15"
           >
             {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -59,10 +59,10 @@ export function MobileMenu({ role, userName, roleLabel, homeHref }: MobileMenuPr
       </div>
 
       {isOpen && (
-        <div className="max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-neutral-800 px-3 pb-4 pt-2">
+        <div className="max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-white/20 px-3 pb-4 pt-2">
           <SidebarNavigation role={role} variant="menu" onNavigate={() => setIsOpen(false)} />
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-800 px-1 pt-3">
-            <p className="text-xs text-neutral-300">{roleLabel}</p>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/20 px-1 pt-3">
+            <p className="text-xs text-white/80">{roleLabel}</p>
             <LogoutButton />
           </div>
         </div>

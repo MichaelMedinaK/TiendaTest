@@ -19,7 +19,23 @@ const DATE_PARTS_FORMATTER = new Intl.DateTimeFormat('en-GB', {
   hour12: false,
 });
 
+const DAY_KEY_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: STORE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 type DatePartName = 'day' | 'month' | 'year' | 'hour' | 'minute';
+
+/** Dia de la tienda ("2026-11-06") desplazado `offsetDays`; mismo formato que la fecha programada (UTC). */
+export function getStoreDayKey(offsetDays = 0, now: Date = new Date()): string {
+  const parts = DAY_KEY_FORMATTER.formatToParts(now);
+  const partValue = (type: 'year' | 'month' | 'day') => Number(parts.find((part) => part.type === type)?.value);
+  const shifted = new Date(Date.UTC(partValue('year'), partValue('month') - 1, partValue('day') + offsetDays));
+
+  return shifted.toISOString().slice(0, 10);
+}
 
 export function formatCurrency(amount: number): string {
   return `${CURRENCY_SYMBOL} ${AMOUNT_FORMATTER.format(amount)}`;

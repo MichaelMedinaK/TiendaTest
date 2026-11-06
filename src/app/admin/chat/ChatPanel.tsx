@@ -133,7 +133,7 @@ export function ChatPanel({ initialContacts }: { initialContacts: ChatContact[] 
                     type="button"
                     onClick={() => selectContact(contact.id)}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition ${
-                      contact.id === selectedId ? 'bg-brand-50' : 'hover:bg-slate-50'
+                      contact.id === selectedId ? 'bg-pink-50' : 'hover:bg-brand-50'
                     }`}
                   >
                     <span className="min-w-0">
@@ -178,7 +178,7 @@ export function ChatPanel({ initialContacts }: { initialContacts: ChatContact[] 
                   <div key={message.id} className={`flex ${message.isMine ? 'justify-end' : 'justify-start'}`}>
                     <div
                       className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                        message.isMine ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-900'
+                        message.isMine ? 'bg-gradient-to-br from-brand-600 to-pink-500 text-white' : 'bg-brand-50 text-slate-900'
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">{message.body}</p>

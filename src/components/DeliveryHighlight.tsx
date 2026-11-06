@@ -7,10 +7,10 @@ export function DeliveryHighlight({ address, schedule }: { address: string | nul
   }
 
   return (
-    <div className="space-y-1.5 rounded-lg border-l-4 border-brand-500 bg-brand-50 px-3 py-2 text-left text-lg font-bold leading-snug text-slate-900">
+    <div className="space-y-1.5 rounded-lg border-l-4 border-pink-500 bg-gradient-to-r from-brand-50 to-pink-50 px-3 py-2 text-left text-lg font-bold leading-snug text-slate-900">
       {address && (
         <p className="flex items-start gap-2">
-          <MapPin className="mt-1 h-5 w-5 shrink-0 text-brand-500" />
+          <MapPin className="mt-1 h-5 w-5 shrink-0 text-pink-500" />
           <span>{address}</span>
         </p>
       )}
