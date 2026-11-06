@@ -17,6 +17,9 @@ import { getBalance, getPaidAmount } from '@/lib/payments-view';
 
 const PAYMENT_METHOD_OPTIONS = toSelectOptions(PAYMENT_METHOD_LABELS);
 
+const PAYMENTS_BUTTON_CLASS =
+  'inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-300 bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-800 transition hover:bg-brand-200';
+
 /** Estado de pago, lo cobrado y el boton que abre el detalle de cobros. */
 export function PaymentsSummary({ order, isOpen, onToggle }: { order: OrderWithItems; isOpen: boolean; onToggle: () => void }) {
   return (
@@ -24,10 +27,10 @@ export function PaymentsSummary({ order, isOpen, onToggle }: { order: OrderWithI
       <span className={`${BADGE_CLASS} ${PAYMENT_STATUS_BADGES[order.paymentStatus]}`}>
         {PAYMENT_STATUS_LABELS[order.paymentStatus]}
       </span>
-      <span className="text-xs text-slate-500">
+      <span className="text-xs font-medium text-brand-800">
         Cobrado {formatCurrency(getPaidAmount(order.payments))} de {formatCurrency(order.total)}
       </span>
-      <button type="button" aria-expanded={isOpen} className={`${SECONDARY_BUTTON_CLASS} px-2 py-1 text-xs`} onClick={onToggle}>
+      <button type="button" aria-expanded={isOpen} className={PAYMENTS_BUTTON_CLASS} onClick={onToggle}>
         <Wallet className="h-3.5 w-3.5" />
         Cobros
       </button>
@@ -100,15 +103,20 @@ export function PaymentsPanel({ order }: { order: OrderWithItems }) {
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+    <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-800">
+        <Wallet className="h-3.5 w-3.5" />
+        Cobros de la venta
+      </p>
+
       {order.payments.length === 0 ? (
         <p className="text-slate-500">Todavia no hay cobros registrados.</p>
       ) : (
-        <ul className="divide-y divide-slate-200">
+        <ul className="divide-y divide-brand-200">
           {order.payments.map((payment) => (
             <li key={payment.id} className="space-y-1 py-2 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className={payment.voidedAt ? 'text-slate-400 line-through' : 'font-medium text-slate-900'}>
+                <p className={payment.voidedAt ? 'text-slate-400 line-through' : 'font-semibold text-brand-900'}>
                   {formatCurrency(payment.amount)} - {PAYMENT_METHOD_LABELS[payment.method]}
                 </p>
                 <p className="text-xs text-slate-500">
@@ -150,12 +158,13 @@ export function PaymentsPanel({ order }: { order: OrderWithItems }) {
         </ul>
       )}
 
-      <p className="font-medium text-slate-900">
-        Saldo por cobrar: {formatCurrency(balance)}
+      <p className="flex items-center justify-between gap-2 rounded-lg bg-brand-100 px-3 py-2 font-semibold text-brand-900">
+        <span>Saldo por cobrar</span>
+        <span>{formatCurrency(balance)}</span>
       </p>
 
       {canCollect && (
-        <form onSubmit={handleRegister} className="space-y-2 border-t border-slate-200 pt-3">
+        <form onSubmit={handleRegister} className="space-y-2 border-t border-brand-200 pt-3">
           <div className="grid gap-2 sm:grid-cols-3">
             <div>
               <label className={LABEL_CLASS} htmlFor={`amount-${order.id}`}>

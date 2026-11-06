@@ -165,7 +165,7 @@ function MovementsLog({ movements }: { movements: ManualMovementView[] }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table className={TABLE_CLASS}>
-        <thead className="bg-slate-50">
+        <thead className="bg-brand-50">
           <tr>
             <th className={TABLE_HEAD_CELL_CLASS}>Fecha</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Movimiento</th>

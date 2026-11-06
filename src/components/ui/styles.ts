@@ -10,12 +10,12 @@ export const PRIMARY_BUTTON_CLASS =
   'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60';
 
 export const SECONDARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 disabled:cursor-not-allowed disabled:opacity-60';
 
 export const TABLE_CLASS = 'min-w-full divide-y divide-slate-200 text-sm';
 
 export const TABLE_HEAD_CELL_CLASS =
-  'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500';
+  'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-brand-800';
 
 export const TABLE_CELL_CLASS = 'px-4 py-3 align-middle text-slate-700';
 
@@ -36,7 +36,7 @@ export const STACKED_TABLE_CLASS = `${STACKED_TABLE_BASE_CLASS} text-sm`;
 /** Variante con la letra algo mas grande, para listas que se leen de un vistazo (historial de ventas). */
 export const STACKED_TABLE_LARGE_CLASS = `${STACKED_TABLE_BASE_CLASS} text-[0.9375rem]`;
 
-export const STACKED_HEAD_CLASS = 'hidden bg-slate-50 md:table-header-group';
+export const STACKED_HEAD_CLASS = 'hidden bg-brand-50 md:table-header-group';
 
 export const STACKED_GROUP_CLASS =
   'mb-3 block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition md:mb-0 md:table-row-group md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:shadow-none';
@@ -44,10 +44,10 @@ export const STACKED_GROUP_CLASS =
 /** Resalta el elemento que se esta editando para saber en cual se esta parado. */
 export const STACKED_GROUP_ACTIVE_CLASS = 'border-brand-500 ring-2 ring-brand-500/40 md:ring-0 md:bg-brand-50';
 
-export const STACKED_ROW_CLASS = 'block py-2 md:table-row md:py-0 md:hover:bg-slate-50';
+export const STACKED_ROW_CLASS = 'block py-2 md:table-row md:py-0 md:hover:bg-brand-50/60';
 
 const STACKED_TITLE_CELL_BASE_CLASS =
-  '-mt-2 mb-1 block border-b border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 md:mb-0 md:mt-0 md:table-cell md:border-b-0 md:bg-transparent md:py-3 md:font-medium';
+  '-mt-2 mb-1 block border-b border-brand-100 bg-brand-50 px-4 py-3 text-base font-semibold text-slate-900 md:mb-0 md:mt-0 md:table-cell md:border-b-0 md:bg-transparent md:py-3 md:font-medium';
 
 export const STACKED_TITLE_CELL_CLASS = `${STACKED_TITLE_CELL_BASE_CLASS} md:text-sm`;
 

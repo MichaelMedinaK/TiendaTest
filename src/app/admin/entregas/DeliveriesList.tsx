@@ -1,11 +1,11 @@
 'use client';
 
-import { Clock, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import type { DeliveryStatus, PaymentMethod } from '@prisma/client';
 
 import { type OrderWithItems, updateDeliveryStatus, updatePaymentMethod } from '@/actions/orders';
+import { DeliveryHighlight } from '@/components/DeliveryHighlight';
 import { OrderItemsList } from '@/components/OrderItemsList';
 import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
@@ -41,19 +41,9 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
             </div>
           </header>
 
-          {formatSchedule(order) && (
-            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <Clock className="h-4 w-4 shrink-0 text-brand-600" />
-              {formatSchedule(order)}
-            </p>
-          )}
+          <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
 
-          <p className="flex items-start gap-2 text-sm text-slate-700">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-            {order.address}
-          </p>
-
-          {formatShipping(order) && <p className="text-sm text-slate-600">{formatShipping(order)}</p>}
+          {formatShipping(order) && <p className="text-sm font-medium text-brand-800">{formatShipping(order)}</p>}
 
           <OrderItemsList items={order.items} className="text-sm" />
 

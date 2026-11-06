@@ -32,7 +32,7 @@ const config: Config = {
         'pop-in': 'pop-in 0.2s ease-out',
       },
       colors: {
-        brand: themed([50, 100, 500, 600, 700], 'brand'),
+        brand: themed([50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 'brand'),
         slate: themed([50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 'slate'),
         emerald: themed([50, 100, 500, 600, 700, 800], 'emerald'),
         rose: themed([50, 100, 500, 600, 700, 800], 'rose'),

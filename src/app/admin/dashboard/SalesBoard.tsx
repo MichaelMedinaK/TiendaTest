@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, MapPin, Pencil, Store } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -9,10 +9,11 @@ import type { DeliveryStatus } from '@prisma/client';
 
 import { type OrderWithItems, updateDeliveryStatus } from '@/actions/orders';
 import type { InventoryProduct } from '@/actions/products';
+import { DeliveryHighlight } from '@/components/DeliveryHighlight';
 import { OrderItemsList } from '@/components/OrderItemsList';
 import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
-import { CARD_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
+import { BADGE_CLASS, CARD_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { NEW_SALE_ANCHOR } from '@/lib/constants';
 import { formatCurrency, formatSchedule, formatScheduleDay, formatShipping, formatUserLabel } from '@/lib/format';
 import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
@@ -84,7 +85,9 @@ export function SalesBoard({
     <div className="space-y-6">
       {groupByScheduledDay(orders).map((group) => (
         <section key={group.key} className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{group.title}</h2>
+          <h2 className="border-l-4 border-brand-500 pl-2 text-base font-bold uppercase tracking-wide text-brand-800">
+            {group.title}
+          </h2>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {group.orders.map((order) =>
@@ -104,32 +107,21 @@ export function SalesBoard({
                     <h3 className="font-semibold text-slate-900">{order.reference}</h3>
                     {showSeller && <p className="text-xs text-brand-600">Vendedor: {formatUserLabel(order.seller)}</p>}
                   </div>
-                  <p className="shrink-0 text-base font-bold text-slate-900">{formatCurrency(order.total)}</p>
+                  <p className="shrink-0 text-base font-bold text-brand-800">{formatCurrency(order.total)}</p>
                 </header>
 
-                {formatSchedule(order) && (
-                  <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
-                    <Clock className="h-4 w-4 shrink-0 text-brand-600" />
-                    {formatSchedule(order)}
-                  </p>
-                )}
+                <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
 
-                <p className="flex items-start gap-2 text-sm text-slate-700">
-                  {order.address ? (
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-                  ) : (
-                    <Store className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-                  )}
-                  <span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className={`${BADGE_CLASS} bg-brand-100 uppercase tracking-wide text-brand-800`}>
                     {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
-                    {order.address ? ` - ${order.address}` : ''}
-                    {formatShipping(order) && <span className="block text-xs text-slate-500">{formatShipping(order)}</span>}
                   </span>
-                </p>
+                  {formatShipping(order) && <span className="text-xs text-slate-500">{formatShipping(order)}</span>}
+                </div>
 
                 <OrderItemsList items={order.items} />
 
-                <div className="space-y-3 border-t border-slate-100 pt-3">
+                <div className="space-y-3 border-t border-brand-100 pt-3">
                   <PaymentsControl order={order} />
                   <div>
                     <p className="mb-1 text-xs font-medium text-slate-500">Envio</p>

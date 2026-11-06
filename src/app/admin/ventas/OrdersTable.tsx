@@ -1,6 +1,6 @@
 'use client';
 
-import { CalendarClock, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -8,11 +8,13 @@ import type { DeliveryStatus } from '@prisma/client';
 
 import { type OrderWithItems, deleteOrder, updateDeliveryStatus } from '@/actions/orders';
 import type { InventoryProduct } from '@/actions/products';
+import { DeliveryHighlight } from '@/components/DeliveryHighlight';
 import { OrderItemsList } from '@/components/OrderItemsList';
 import { PaymentsPanel, PaymentsSummary } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
 import {
+  BADGE_CLASS,
   CARD_CLASS,
   SECONDARY_BUTTON_CLASS,
   STACKED_CELL_CLASS,
@@ -83,37 +85,30 @@ export function OrdersTable({
             className={`${STACKED_GROUP_CLASS} ${editingOrderId === order.id ? STACKED_GROUP_ACTIVE_CLASS : ''}`}
           >
             <tr className={STACKED_ROW_CLASS}>
-              <td data-label="Venta" className={STACKED_TITLE_CELL_LARGE_CLASS}>
+              <td data-label="Venta" className={`${STACKED_TITLE_CELL_LARGE_CLASS} md:w-[32%] md:min-w-[15rem]`}>
                 <p>{order.reference}</p>
                 {showSeller && (
                   <p className="text-xs font-normal text-brand-600">Vendedor: {formatUserLabel(order.seller)}</p>
                 )}
-                <p className="text-xs font-normal uppercase tracking-wide text-slate-500">
-                  {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
+                <p className="mb-2 mt-1">
+                  <span className={`${BADGE_CLASS} bg-brand-100 uppercase tracking-wide text-brand-800`}>
+                    {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
+                  </span>
                 </p>
-                {order.address && (
-                  <p className="mt-1 flex items-start gap-1.5 font-semibold">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-                    <span>{order.address}</span>
-                  </p>
+                <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
+                {formatShipping(order) && (
+                  <p className="mt-1 text-xs font-normal text-slate-500">{formatShipping(order)}</p>
                 )}
-                {formatSchedule(order) && (
-                  <p className="mt-1 flex items-start gap-1.5 font-semibold">
-                    <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-                    <span>{formatSchedule(order)}</span>
-                  </p>
-                )}
-                {formatShipping(order) && <p className="text-xs font-normal text-slate-500">{formatShipping(order)}</p>}
               </td>
               <td data-label="Fecha" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>
                 <span className="font-semibold text-slate-900">{formatDateTime(order.createdAt)}</span>
               </td>
-              <td data-label="Productos" className={STACKED_CELL_CLASS}>
+              <td data-label="Productos" className={`${STACKED_CELL_CLASS} md:min-w-[12rem]`}>
                 <OrderItemsList items={order.items} className="text-[0.8125rem]" />
               </td>
               <td data-label="Pago" className={STACKED_CELL_CLASS}>
                 <div className="flex flex-col items-end gap-1 md:items-start">
-                  <p className="text-xs text-slate-500">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</p>
+                  <p className="text-xs font-semibold text-brand-800">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</p>
                   <PaymentsSummary
                     order={order}
                     isOpen={paymentsOrderId === order.id}
@@ -121,7 +116,9 @@ export function OrdersTable({
                   />
                 </div>
               </td>
-              <td data-label="Total" className={`${STACKED_CELL_CLASS} font-semibold`}>{formatCurrency(order.total)}</td>
+              <td data-label="Total" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>
+                <span className="font-bold text-brand-800">{formatCurrency(order.total)}</span>
+              </td>
               <td data-label="Envio" className={STACKED_CELL_CLASS}>
                 <StatusSelect<DeliveryStatus>
                   ariaLabel={`Estado del envio de ${order.reference}`}
@@ -131,7 +128,7 @@ export function OrdersTable({
                 />
               </td>
               <td data-label="Acciones" className={STACKED_CELL_CLASS}>
-                <div className="flex gap-2">
+                <div className="flex gap-2 md:flex-col">
                   <button
                     type="button"
                     className={SECONDARY_BUTTON_CLASS}

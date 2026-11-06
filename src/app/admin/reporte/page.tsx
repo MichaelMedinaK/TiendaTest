@@ -153,7 +153,7 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
           <h2 className="text-lg font-semibold text-slate-900">Resumen por vendedor</h2>
           <div className={`${CARD_CLASS} overflow-x-auto p-0`}>
             <table className={TABLE_CLASS}>
-              <thead className="bg-slate-50">
+              <thead className="bg-brand-50">
                 <tr>
                   <th className={TABLE_HEAD_CELL_CLASS}>Vendedor</th>
                   <th className={TABLE_HEAD_CELL_CLASS}>Ventas</th>
@@ -187,7 +187,7 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
         )}
         <div className={`${CARD_CLASS} overflow-x-auto p-0`}>
           <table className={TABLE_CLASS}>
-            <thead className="bg-slate-50">
+            <thead className="bg-brand-50">
               <tr>
                 <th className={TABLE_HEAD_CELL_CLASS}>Producto - SKU</th>
                 {isAdmin && <th className={TABLE_HEAD_CELL_CLASS}>Inventario</th>}
@@ -219,7 +219,7 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
         <h2 className="text-lg font-semibold text-slate-900">Pedidos</h2>
         <div className={`${CARD_CLASS} overflow-x-auto p-0`}>
           <table className={TABLE_CLASS}>
-            <thead className="bg-slate-50">
+            <thead className="bg-brand-50">
               <tr>
                 <th className={TABLE_HEAD_CELL_CLASS}>Fecha</th>
                 <th className={TABLE_HEAD_CELL_CLASS}>Referencia</th>

@@ -55,6 +55,23 @@ const DEFAULT_DELIVERY_METHOD: DeliveryMethod = 'PICKUP';
 const PAYMENT_METHOD_OPTIONS = toSelectOptions(PAYMENT_METHOD_LABELS);
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 
+/** Duracion por defecto de la ventana de entrega: la hora "hasta" sale 30 minutos despues de la "desde". */
+const DEFAULT_SLOT_MINUTES = 30;
+const LAST_MINUTE_OF_DAY = 23 * 60 + 59;
+
+/** Suma minutos a una hora "HH:MM" sin pasar de medianoche (el rango horario es de un mismo dia). */
+function addMinutesToTime(time: string, minutes: number): string | null {
+  const match = /^(\d{2}):(\d{2})/.exec(time);
+
+  if (!match) {
+    return null;
+  }
+
+  const total = Math.min(Number(match[1]) * 60 + Number(match[2]) + minutes, LAST_MINUTE_OF_DAY);
+
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
 const createEmptyLine = (products: InventoryProduct[]): OrderLine => ({
   productId: products[0]?.id ?? '',
   quantity: 1,
@@ -92,6 +109,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(order?.deliveryMethod ?? DEFAULT_DELIVERY_METHOD);
   const [distanceKm, setDistanceKm] = useState<string>(order?.distanceKm != null ? String(order.distanceKm) : '');
+  const [scheduledFrom, setScheduledFrom] = useState(order?.scheduledFrom ?? '');
+  const [scheduledTo, setScheduledTo] = useState(order?.scheduledTo ?? '');
   const [isPaid, setIsPaid] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isQuoting, startQuoting] = useTransition();
@@ -129,6 +148,18 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
 
   const removeLine = (index: number) => {
     setLines((currentLines) => currentLines.filter((_, lineIndex) => lineIndex !== index));
+  };
+
+  const handleScheduledFromChange = (nextFrom: string) => {
+    const suggestedTo = addMinutesToTime(nextFrom, DEFAULT_SLOT_MINUTES);
+    const previousSuggestedTo = addMinutesToTime(scheduledFrom, DEFAULT_SLOT_MINUTES);
+
+    // "Hasta" se ajusta mientras siga siendo el sugerido o ya no quede despues de "desde"; si se edito a mano, se respeta.
+    if (suggestedTo && (!scheduledTo || scheduledTo === previousSuggestedTo || scheduledTo <= nextFrom)) {
+      setScheduledTo(suggestedTo);
+    }
+
+    setScheduledFrom(nextFrom);
   };
 
   const handleQuoteDistance = () => {
@@ -187,6 +218,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         form.reset();
         setDeliveryMethod(DEFAULT_DELIVERY_METHOD);
         setDistanceKm('');
+        setScheduledFrom('');
+        setScheduledTo('');
         setIsPaid(false);
         setLines([createEmptyLine(sellerProducts)]);
         toast.success(`Venta registrada por ${formatCurrency(result.data.total)}`);
@@ -269,7 +302,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
           </select>
         </div>
 
-        <div>
+        {/* Oculto (no desmontado) para conservar lo escrito si se vuelve a elegir envio. */}
+        <div className={isDelivery ? '' : 'hidden'}>
           <label className={LABEL_CLASS} htmlFor="address">
             Direccion
           </label>
@@ -282,11 +316,11 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
             maxLength={500}
             defaultValue={order?.address ?? ''}
             className={INPUT_CLASS}
-            placeholder={isDelivery ? 'Direccion o zona de entrega' : 'No aplica para recogida'}
+            placeholder="Direccion o zona de entrega"
           />
         </div>
 
-        <div>
+        <div className={isDelivery ? '' : 'hidden'}>
           <label className={LABEL_CLASS} htmlFor="distanceKm">
             Kilometros
           </label>
@@ -298,25 +332,23 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
             min={0}
             step="any"
             disabled={!isDelivery}
-            value={isDelivery ? distanceKm : ''}
+            value={distanceKm}
             onChange={(event) => setDistanceKm(event.target.value)}
             className={INPUT_CLASS}
-            placeholder={isDelivery ? 'Ej. 12.5' : 'No aplica para recogida'}
+            placeholder="Ej. 12.5"
           />
-          {isDelivery && (
-            <button
-              type="button"
-              className={`${SECONDARY_BUTTON_CLASS} mt-2`}
-              disabled={isQuoting}
-              onClick={handleQuoteDistance}
-            >
-              <Route className="h-4 w-4" />
-              {isQuoting ? 'Calculando...' : 'Calcular km desde la direccion'}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${SECONDARY_BUTTON_CLASS} mt-2`}
+            disabled={isQuoting}
+            onClick={handleQuoteDistance}
+          >
+            <Route className="h-4 w-4" />
+            {isQuoting ? 'Calculando...' : 'Calcular km desde la direccion'}
+          </button>
         </div>
 
-        <div>
+        <div className={isDelivery ? '' : 'hidden'}>
           <label className={LABEL_CLASS} htmlFor="shippingPrice">
             Precio de envio (automatico)
           </label>
@@ -325,16 +357,13 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
             type="text"
             readOnly
             disabled={!isDelivery}
-            value={isDelivery ? formatCurrency(shippingAmount) : ''}
+            value={formatCurrency(shippingAmount)}
             className={INPUT_CLASS}
-            placeholder={isDelivery ? '' : 'No aplica para recogida'}
           />
-          {isDelivery && (
-            <p className="mt-1 text-xs text-slate-500">
-              {distanceKm || 0} km x {formatCurrency(shippingRate.ratePerKm)} por km, redondeado hacia arriba (minimo{' '}
-              {formatCurrency(shippingRate.minPrice)})
-            </p>
-          )}
+          <p className="mt-1 text-xs text-slate-500">
+            {distanceKm || 0} km x {formatCurrency(shippingRate.ratePerKm)} por km, redondeado hacia arriba (minimo{' '}
+            {formatCurrency(shippingRate.minPrice)})
+          </p>
         </div>
 
         <div>
@@ -359,7 +388,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
               id="scheduledFrom"
               name="scheduledFrom"
               type="time"
-              defaultValue={order?.scheduledFrom ?? ''}
+              value={scheduledFrom}
+              onChange={(event) => handleScheduledFromChange(event.target.value)}
               className={INPUT_CLASS}
             />
           </div>
@@ -371,7 +401,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
               id="scheduledTo"
               name="scheduledTo"
               type="time"
-              defaultValue={order?.scheduledTo ?? ''}
+              value={scheduledTo}
+              onChange={(event) => setScheduledTo(event.target.value)}
               className={INPUT_CLASS}
             />
           </div>
