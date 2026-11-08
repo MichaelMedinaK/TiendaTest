@@ -69,9 +69,10 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
   const pendingAmount = orders
     .filter((order) => order.deliveryStatus !== DeliveryStatus.CANCELLED)
     .reduce((accumulated, order) => accumulated + getBalance(order.total, order.payments), 0);
-  const stockUnits = products.reduce((accumulated, product) => accumulated + product.stock, 0);
-  const stockValue = products.reduce((accumulated, product) => accumulated + product.stock * product.price, 0);
-  const stockCost = products.reduce((accumulated, product) => accumulated + product.stock * product.costPrice, 0);
+  // Un stock negativo (vendido sin stock) no suma valor ni unidades al inventario.
+  const stockUnits = products.reduce((accumulated, product) => accumulated + Math.max(product.stock, 0), 0);
+  const stockValue = products.reduce((accumulated, product) => accumulated + Math.max(product.stock, 0) * product.price, 0);
+  const stockCost = products.reduce((accumulated, product) => accumulated + Math.max(product.stock, 0) * product.costPrice, 0);
   const lowStockProducts = products.filter((product) => product.stock <= LOW_STOCK_THRESHOLD);
 
   // Las ventas canceladas no generan ganancia.

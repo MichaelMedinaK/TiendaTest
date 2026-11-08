@@ -34,6 +34,8 @@ function CatalogForm({ onDone }: { onDone: () => void }) {
       const result = await createCatalogProduct({
         name: String(formData.get('name') ?? ''),
         sku: String(formData.get('sku') ?? ''),
+        costPrice: Number(formData.get('costPrice')),
+        price: Number(formData.get('price')),
       });
 
       if (!result.success) {
@@ -52,7 +54,7 @@ function CatalogForm({ onDone }: { onDone: () => void }) {
       <h2 className="text-lg font-semibold text-slate-900">Nuevo producto del catalogo</h2>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-3">
           <label className={LABEL_CLASS} htmlFor="name">
             Nombre
           </label>
@@ -64,6 +66,20 @@ function CatalogForm({ onDone }: { onDone: () => void }) {
             SKU
           </label>
           <input id="sku" name="sku" maxLength={50} className={INPUT_CLASS} placeholder="ANI-001" />
+        </div>
+
+        <div>
+          <label className={LABEL_CLASS} htmlFor="costPrice">
+            Precio real (costo)
+          </label>
+          <input id="costPrice" name="costPrice" type="number" min={0} step="any" defaultValue={0} required className={INPUT_CLASS} />
+        </div>
+
+        <div>
+          <label className={LABEL_CLASS} htmlFor="price">
+            Precio de venta
+          </label>
+          <input id="price" name="price" type="number" min={0.01} step="any" required className={INPUT_CLASS} />
         </div>
       </div>
 

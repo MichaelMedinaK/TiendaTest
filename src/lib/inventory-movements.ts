@@ -10,21 +10,24 @@ export interface StockChange {
   reason: string;
   userId: string;
   orderId?: string;
+  /** Las ventas pueden dejar el stock en negativo (se vende sin stock y se repone despues). */
+  allowNegative?: boolean;
 }
 
 /**
  * Cambia el stock de un item y deja el movimiento con el stock resultante, todo en la misma transaccion.
- * Una resta solo se aplica si alcanza el stock (el filtro garantiza el descuento atomico con ventas simultaneas).
- * Devuelve el stock resultante, o null si no alcanzaba.
+ * Una resta solo se aplica si alcanza el stock, salvo que se permita negativo (el filtro garantiza el descuento
+ * atomico con ventas simultaneas). Devuelve el stock resultante, o null si no alcanzaba.
  */
 export async function applyStockChange(
   transaction: Prisma.TransactionClient,
   change: StockChange,
 ): Promise<number | null> {
   const { inventoryItemId, delta } = change;
+  const mustCoverStock = delta < 0 && !change.allowNegative;
 
   const update = await transaction.inventoryItem.updateMany({
-    where: delta < 0 ? { id: inventoryItemId, stock: { gte: -delta } } : { id: inventoryItemId },
+    where: mustCoverStock ? { id: inventoryItemId, stock: { gte: -delta } } : { id: inventoryItemId },
     data: { stock: { increment: delta } },
   });
 

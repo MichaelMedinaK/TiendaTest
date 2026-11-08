@@ -4,8 +4,9 @@
 --   1) Asigna las ventas existentes al administrador mas antiguo (columna orders.sellerId).
 --   2) Crea la tabla inventory_items y copia a ella el stock, costo y precio de venta de cada producto actual
 --      (asignados al administrador mas antiguo). Los productos actuales pasan a ser el catalogo general.
--- Despues, "db push --accept-data-loss" elimina de products las columnas viejas (stock, price, costPrice, ownerId);
--- no se pierde nada porque ya quedaron copiadas en inventory_items.
+-- Despues, "db push --accept-data-loss" elimina de products las columnas viejas (stock, ownerId) y de inventory_items
+-- el costo y el precio; no se pierde nada: el stock queda en inventory_items y los precios siguen en products.
+-- Si el modelo por usuario ya estaba aplicado (precios en inventory_items), usa en su lugar "npm run db:catalog-prices".
 -- Es idempotente: se puede ejecutar varias veces, y no hace nada si el modelo nuevo ya esta aplicado.
 --
 -- Como ejecutarlo:  npm run db:inventory-model   (o pegarlo en el SQL Editor de Supabase)

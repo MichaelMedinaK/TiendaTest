@@ -93,7 +93,7 @@ src/
 
 - **Contrato único de acciones**: toda Server Action se ejecuta dentro de `executeAction`, que traduce las excepciones de negocio a `{ success: false, error }` y nunca filtra detalles técnicos al cliente.
 - **Un solo log por petición**: `ActionTrace` acumula los pasos en memoria y emite un único log JSON (`trace_id`, `business_id`, `uri`, `duration_ms`, `status`, `steps`) al terminar, en lugar de dispersar `console.log` por el flujo.
-- **Integridad de stock**: la venta se registra en una transacción y el descuento usa `updateMany` filtrando por `stock >= cantidad`, lo que evita sobreventa ante peticiones simultáneas. Eliminar o editar una venta devuelve/reajusta las unidades en el inventario.
+- **Integridad de stock**: la venta se registra en una transacción y el descuento usa `updateMany` con incremento atómico. Se puede vender sin stock (queda en negativo hasta reponer); las salidas manuales sí exigen `stock >= cantidad`. Eliminar o editar una venta devuelve/reajusta las unidades en el inventario.
 - **Precios de confianza**: el total se calcula con el precio del catálogo, nunca con el que envía el navegador.
 - **Sesión verificada**: el layout se pinta con el JWT, pero cada acción revalida el usuario en base de datos para que una desactivación tenga efecto inmediato.
 - **Gestión de claves**: el admin puede resetear la clave de cualquier usuario sin conocer la anterior; el cambio de clave propia exige la contraseña actual para que una sesión robada no pueda apropiarse de la cuenta.
@@ -110,6 +110,7 @@ src/
 | `npm run db:push`          | Sincroniza el esquema con la base de datos     |
 | `npm run db:rls`           | Activa RLS y blinda la base (Supabase)         |
 | `npm run db:inventory-model` | Prepara el catalogo general + inventario por usuario (antes de `db:push`) |
+| `npm run db:catalog-prices` | Pasa los precios de los inventarios al catalogo (antes de `db:push --accept-data-loss`) |
 | `npm run db:post-push` | Datos iniciales del modelo nuevo: stock inicial y cobros de ventas ya pagadas (después de `db:push`) |
 | `npm run db:seed`          | Ejecuta el seed                                |
 | `npm run db:copy-products` | Copia el catálogo de productos entre dos bases |

@@ -42,8 +42,6 @@ export function AddToInventoryForm({ ownerId, catalog, onDone }: AddToInventoryF
     startTransition(async () => {
       const result = await addToInventory({
         productId: String(formData.get('productId') ?? ''),
-        costPrice: Number(formData.get('costPrice')),
-        price: Number(formData.get('price')),
         quantity: Number(formData.get('quantity')),
         reason: String(formData.get('reason') ?? ''),
         ownerId,
@@ -64,8 +62,8 @@ export function AddToInventoryForm({ ownerId, catalog, onDone }: AddToInventoryF
     <form onSubmit={handleSubmit} className={`${CARD_CLASS} space-y-4`}>
       <h2 className="text-lg font-semibold text-slate-900">Agregar producto al inventario</h2>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <div className="sm:col-span-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
           <label className={LABEL_CLASS} htmlFor="productId">
             Producto del catalogo
           </label>
@@ -76,20 +74,7 @@ export function AddToInventoryForm({ ownerId, catalog, onDone }: AddToInventoryF
               </option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label className={LABEL_CLASS} htmlFor="costPrice">
-            Precio real (costo)
-          </label>
-          <input id="costPrice" name="costPrice" type="number" min={0} step="any" defaultValue={0} required className={INPUT_CLASS} />
-        </div>
-
-        <div>
-          <label className={LABEL_CLASS} htmlFor="price">
-            Precio de venta
-          </label>
-          <input id="price" name="price" type="number" min={0.01} step="any" required className={INPUT_CLASS} />
+          <p className="mt-1 text-xs text-slate-500">Los precios los define el administrador en el catalogo.</p>
         </div>
 
         <div>

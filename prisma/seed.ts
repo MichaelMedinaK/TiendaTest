@@ -57,10 +57,10 @@ async function seedDemoProducts(): Promise<void> {
     return;
   }
 
-  for (const { stock, costPrice, price, ...product } of DEMO_PRODUCTS) {
+  for (const { stock, ...product } of DEMO_PRODUCTS) {
     const created = await prisma.product.create({ data: product });
     const item = await prisma.inventoryItem.create({
-      data: { ownerId: admin.id, productId: created.id, costPrice, price, stock },
+      data: { ownerId: admin.id, productId: created.id, stock },
     });
 
     await prisma.inventoryMovement.create({

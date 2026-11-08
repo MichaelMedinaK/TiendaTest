@@ -113,11 +113,11 @@ En la columna **Acceso**, el botón **Desactivar** / **Activar** corta o restitu
 
 ## 5. Catálogo e inventario
 
-Los productos son **generales**: el administrador los crea una sola vez en el **Catálogo** (nombre y SKU) y cada vendedor los **agrega a su propio inventario**, con su **precio real** (lo que le cuesta, lo escribe él), su **precio de venta** y su stock. El mismo producto puede tener precios y cantidades distintos en cada inventario.
+Los productos son **generales**: el administrador los crea una sola vez en el **Catálogo** con su nombre, SKU, **precio real** (costo) y **precio de venta**. Solo el administrador define y cambia esos precios. Cada vendedor **agrega a su propio inventario** los productos que maneja, eligiendo solo el producto y su stock: los precios son siempre los del catálogo. El mismo producto puede tener cantidades distintas en cada inventario.
 
 ### Catálogo (solo ADMIN)
 
-En **Catálogo**, **+ Nuevo producto** crea el producto para todos. Se puede editar nombre y SKU. Solo se puede eliminar si no está en ningún inventario ni en ventas.
+En **Catálogo**, **+ Nuevo producto** crea el producto para todos, con sus dos precios. Se puede editar nombre, SKU y precios. Al cambiar el precio de venta, las ventas aún pendientes que tenían el precio anterior se recalculan; las ya cerradas no cambian, ni tampoco el precio real que ya quedó registrado en ventas anteriores. Solo se puede eliminar un producto si no está en ningún inventario ni en ventas.
 
 ### Ver el inventario de otro usuario (ADMIN)
 
@@ -125,18 +125,18 @@ En **Inventario**, el selector **Inventario de** cambia entre usuarios. Todo lo 
 
 ### Agregar un producto al inventario
 
-Pulsa **+ Agregar al inventario**, elige el producto del catálogo y escribe precio real, precio de venta y stock inicial. Si pones stock inicial, la descripción es obligatoria (por defecto "Stock inicial") y queda como la primera entrada del historial.
+Pulsa **+ Agregar al inventario**, elige el producto del catálogo y escribe el stock inicial. Si pones stock inicial, la descripción es obligatoria (por defecto "Stock inicial") y queda como la primera entrada del historial. No se escriben precios: salen del catálogo.
 
 ### La lista
 
-Cada producto se ve en una línea con su nombre y **precio de venta**. Toca la línea para desplegar el resto: precio real, margen, stock y las acciones **Entrada**, **Salida**, **Editar precios** e **Historial**.
+Cada producto se ve en una línea con su nombre y **precio de venta**. Toca la línea para desplegar el resto: precio real, margen, stock y las acciones **Entrada**, **Salida** e **Historial**.
 
 ### Modificar el stock: entradas y salidas
 
 El stock **no se edita directamente**. Solo cambia con:
 - **Entrada:** suma unidades (por ejemplo, mercancía recibida).
 - **Salida:** resta unidades (por ejemplo, mercancía entregada a otra persona). No puede dejar el stock en negativo.
-- **Ventas:** descuentan solas al registrarse y devuelven al cancelar o eliminar la venta.
+- **Ventas:** descuentan solas al registrarse y devuelven al cancelar o eliminar la venta. Una venta **puede registrarse aunque no haya stock**: el stock queda en negativo (marcado como *por reponer*) y se compensa con la siguiente entrada.
 
 Cada entrada y salida exige una **descripción** y queda en el **Historial** con el usuario, la fecha y el stock resultante. Los inventarios de distintos vendedores no se sincronizan: si Juan entrega 5 a Pedro, Juan registra una salida y Pedro registra su propia entrada.
 
@@ -147,10 +147,6 @@ Los productos con 5 unidades o menos se marcan como **(bajo)**.
 Junto a **+ Agregar al inventario** está el botón **+ Entrada / salida**. Despliega un formulario donde eliges el **producto**, el **movimiento** (Entrada o Salida), la **cantidad** y el **motivo** (obligatorio). Al registrar, el formulario queda abierto para cargar varios movimientos seguidos y debajo aparece una **tabla** con las últimas entradas y salidas: fecha, movimiento, producto, cantidad, motivo y quién lo registró.
 
 La tabla muestra solo movimientos hechos a mano; las ventas (y sus devoluciones) no aparecen allí porque descuentan solas.
-
-### Editar precios
-
-**Editar precios** cambia el precio real y el precio de venta. La lista muestra el **margen** (venta − real). Al cambiar el precio de venta, las ventas aún pendientes de ese vendedor que tenían el precio anterior se recalculan; las ya cerradas no cambian. El precio real que ya quedó registrado en ventas anteriores tampoco cambia.
 
 ---
 
@@ -163,7 +159,7 @@ En **Ventas**, pulsa **+ Nueva venta** para desplegar el formulario:
 1. **Descripción** (obligatoria), **Referencia** y **Dirección** (opcionales; solo la parte necesaria, por ejemplo el distrito; sin dirección la venta aparece como *Retiro en tienda*).
 2. **Método de pago**: Efectivo o Transferencia (el método previsto; cada cobro registra el suyo).
 3. **Pago recibido**: déjalo en *Pendiente de pago*, o márcalo como *Ya pagado* para registrar el cobro por el total.
-4. Elige el **producto** del stock y la **cantidad**; el **precio unitario** se llena solo con el del inventario (ver *Sobre los precios*). Con **Agregar producto** sumas más líneas a la misma venta.
+4. Elige el **producto** del stock y la **cantidad**; el **precio unitario** se llena solo con el del catálogo (ver *Sobre los precios*). Con **Agregar producto** sumas más líneas a la misma venta.
 5. Revisa el **Total estimado** y pulsa **Registrar venta**. El envío siempre parte como *Nuevo*.
 
 Al guardarse, el stock de cada producto se descuenta automáticamente **del inventario del vendedor**.
@@ -172,13 +168,13 @@ Al guardarse, el stock de cada producto se descuenta automáticamente **del inve
 
 **Envío a domicilio:** escribe la dirección y pulsa **Calcular km desde la dirección** para llenar los kilómetros automáticamente (ver sección 7).
 
-**Sobre los precios:** cada línea toma sola el **precio de venta** que el producto tiene en el inventario del vendedor, así que no hay que escribirlo. Si en esa venta quieres cobrar otro valor, pulsa **Cambiar precio** sobre la línea y escríbelo (**Usar el del inventario** lo devuelve al automático). El precio cobrado queda congelado en la venta: cambiarlo después en el inventario no altera las ventas ya registradas.
+**Sobre los precios:** cada línea toma sola el **precio de venta** que el producto tiene en el catálogo, así que no hay que escribirlo. Si en esa venta quieres cobrar otro valor, pulsa **Cambiar precio** sobre la línea y escríbelo (**Usar el del catálogo** lo devuelve al automático). El precio cobrado queda congelado en la venta: cambiarlo después en el catálogo no altera las ventas ya registradas (salvo las pendientes que aún tenían el precio anterior, que se recalculan).
 
-**Si no hay stock suficiente** verás, por ejemplo, *"Stock insuficiente para "Gorra Deportiva". Disponible: 4"* y la venta **no** se registra: o se guarda completa, o no se guarda nada.
+**Si no hay stock suficiente** la venta se registra igual: el formulario te avisa que el stock quedará en negativo hasta que registres la entrada de mercancía.
 
 ### Editar una venta
 
-En la fila de la venta pulsa **Editar**, cambia cualquier dato o los productos y pulsa **Guardar cambios**. El stock se ajusta solo por la diferencia (se devuelve lo que ya no se vende y se descuenta lo nuevo) y queda en el historial. Si no alcanza el stock, la edición se rechaza y la venta queda como estaba.
+En la fila de la venta pulsa **Editar**, cambia cualquier dato o los productos y pulsa **Guardar cambios**. El stock se ajusta solo por la diferencia (se devuelve lo que ya no se vende y se descuenta lo nuevo) y queda en el historial. Si falta stock, la edición se registra igual y el stock queda en negativo.
 
 ### Eliminar una venta
 
@@ -207,7 +203,7 @@ La columna **Envío** tiene un desplegable que guarda al instante:
 | Entregado   | Recibido por el cliente           |
 | Cancelado   | El pedido se canceló              |
 
-Al pasar un pedido a **Cancelado**, sus unidades **vuelven al stock** del vendedor (queda en el historial). Si lo reactivas, se vuelven a descontar; si ya no hay stock suficiente, el cambio se rechaza.
+Al pasar un pedido a **Cancelado**, sus unidades **vuelven al stock** del vendedor (queda en el historial). Si lo reactivas, se vuelven a descontar (aunque no haya stock: queda en negativo).
 
 Si un cambio falla, el desplegable vuelve solo a su valor anterior y muestra el motivo: lo que ves siempre refleja lo que está guardado.
 
@@ -275,7 +271,7 @@ El botón **Cerrar sesión**, abajo en el menú lateral, borra la cookie y te de
 | *"El usuario esta desactivado"* | Un admin desactivó la cuenta. Pide que la reactiven. |
 | La app te devuelve al login sola | La sesión venció (`AUTH_TOKEN_TTL_HOURS`). Vuelve a entrar. |
 | *"Solo un administrador puede gestionar usuarios"* | Tu rol es STAFF; pide a un admin que haga el cambio o que te suba de rol. |
-| *"Stock insuficiente para X"* | Vendes más unidades de las disponibles. Ajusta la cantidad o repone stock en Inventario. |
+| *"Stock insuficiente para X"* | Solo ocurre al registrar una **salida** manual con más unidades de las disponibles. Las ventas sí se registran sin stock. Ajusta la cantidad o registra una entrada antes. |
 | No puedes desactivarte a ti mismo | Es intencional, para no dejar la tienda sin administrador. Usa otra cuenta admin. |
 | *"Falta configurar el punto de salida de la tienda"* | Define `STORE_ORIGIN_LAT` y `STORE_ORIGIN_LNG` en `.env` (ver [CONFIGURACION.md](./CONFIGURACION.md#cotización-del-delivery)). |
 | *"No se encontro la direccion"* | Agrega barrio, ciudad o un punto de referencia a la dirección. |

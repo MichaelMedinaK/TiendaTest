@@ -25,9 +25,9 @@ import {
   STACKED_WRAPPER_CLASS,
   TABLE_HEAD_CELL_CLASS,
 } from '@/components/ui/styles';
-import { formatProductLabel } from '@/lib/format';
+import { formatCurrency, formatProductLabel } from '@/lib/format';
 
-const COLUMN_COUNT = 3;
+const COLUMN_COUNT = 5;
 
 export function CatalogTable({ products }: { products: CatalogProduct[] }) {
   if (products.length === 0) {
@@ -40,6 +40,8 @@ export function CatalogTable({ products }: { products: CatalogProduct[] }) {
         <thead className={STACKED_HEAD_CLASS}>
           <tr>
             <th className={TABLE_HEAD_CELL_CLASS}>Producto - SKU</th>
+            <th className={TABLE_HEAD_CELL_CLASS}>Precio real</th>
+            <th className={TABLE_HEAD_CELL_CLASS}>Precio de venta</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Uso</th>
             <th className={TABLE_HEAD_CELL_CLASS}>Acciones</th>
           </tr>
@@ -85,6 +87,8 @@ function CatalogRow({ product }: { product: CatalogProduct }) {
     <tbody className={`${STACKED_GROUP_CLASS} ${isEditing ? STACKED_GROUP_ACTIVE_CLASS : ''}`}>
       <tr className={STACKED_ROW_CLASS}>
         <td data-label="Producto" className={STACKED_TITLE_CELL_CLASS}>{formatProductLabel(product)}</td>
+        <td data-label="Precio real" className={STACKED_CELL_CLASS}>{formatCurrency(product.costPrice)}</td>
+        <td data-label="Precio de venta" className={STACKED_CELL_CLASS}>{formatCurrency(product.price)}</td>
         <td data-label="Uso" className={STACKED_CELL_CLASS}>
           {product.inventoriesCount} inventario(s) - {product.salesCount} venta(s)
         </td>
@@ -139,6 +143,8 @@ function EditCatalogForm({ product, onFinished }: { product: CatalogProduct; onF
       const result = await updateCatalogProduct(product.id, {
         name: String(formData.get('name') ?? ''),
         sku: String(formData.get('sku') ?? ''),
+        costPrice: Number(formData.get('costPrice')),
+        price: Number(formData.get('price')),
       });
 
       if (!result.success) {
@@ -146,7 +152,14 @@ function EditCatalogForm({ product, onFinished }: { product: CatalogProduct; onF
         return;
       }
 
-      feedback.success(`Producto "${formatProductLabel(result.data)}" actualizado`);
+      const { updatedOrdersCount = 0 } = result.data;
+      const label = formatProductLabel(result.data);
+
+      feedback.success(
+        updatedOrdersCount > 0
+          ? `Producto "${label}" actualizado. Se recalcularon ${updatedOrdersCount} venta(s) pendiente(s) con el nuevo precio`
+          : `Producto "${label}" actualizado`,
+      );
       router.refresh();
       onFinished();
     });
@@ -155,7 +168,7 @@ function EditCatalogForm({ product, onFinished }: { product: CatalogProduct; onF
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-3">
           <label className={LABEL_CLASS} htmlFor={`name-${product.id}`}>
             Nombre
           </label>
@@ -179,6 +192,38 @@ function EditCatalogForm({ product, onFinished }: { product: CatalogProduct; onF
             defaultValue={product.sku ?? ''}
             className={INPUT_CLASS}
             placeholder="Opcional"
+          />
+        </div>
+        <div>
+          <label className={LABEL_CLASS} htmlFor={`cost-${product.id}`}>
+            Precio real (costo)
+          </label>
+          <input
+            id={`cost-${product.id}`}
+            name="costPrice"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="any"
+            required
+            defaultValue={product.costPrice}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div>
+          <label className={LABEL_CLASS} htmlFor={`price-${product.id}`}>
+            Precio de venta
+          </label>
+          <input
+            id={`price-${product.id}`}
+            name="price"
+            type="number"
+            inputMode="decimal"
+            min={0.01}
+            step="any"
+            required
+            defaultValue={product.price}
+            className={INPUT_CLASS}
           />
         </div>
       </div>

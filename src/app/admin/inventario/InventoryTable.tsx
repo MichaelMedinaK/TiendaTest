@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, History, Pencil } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, History } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, type ReactNode, useEffect, useState, useTransition } from 'react';
 
@@ -9,7 +9,6 @@ import {
   type MovementView,
   getMovements,
   registerMovement,
-  updateInventoryPrices,
 } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
@@ -38,7 +37,7 @@ import { MOVEMENT_TYPE_LABELS } from '@/lib/labels';
 
 const COLUMN_COUNT = 2;
 
-type Panel = 'ENTRY' | 'EXIT' | 'PRICES' | 'HISTORY';
+type Panel = 'ENTRY' | 'EXIT' | 'HISTORY';
 
 export function InventoryTable({ products }: { products: InventoryProduct[] }) {
   if (products.length === 0) {
@@ -94,7 +93,7 @@ function ProductRow({ product }: { product: InventoryProduct }) {
                   <span
                     className={`${BADGE_CLASS} ${isLowStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}
                   >
-                    {product.stock} {isLowStock ? '(bajo)' : ''}
+                    {product.stock} {product.stock < 0 ? '(por reponer)' : isLowStock ? '(bajo)' : ''}
                   </span>
                 </Detail>
               </dl>
@@ -108,10 +107,6 @@ function ProductRow({ product }: { product: InventoryProduct }) {
                   <ArrowUpFromLine className="h-4 w-4 text-rose-600" />
                   Salida
                 </button>
-                <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => togglePanel('PRICES')}>
-                  <Pencil className="h-4 w-4" />
-                  Editar precios
-                </button>
                 <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => togglePanel('HISTORY')}>
                   <History className="h-4 w-4" />
                   Historial
@@ -121,7 +116,6 @@ function ProductRow({ product }: { product: InventoryProduct }) {
               {(panel === 'ENTRY' || panel === 'EXIT') && (
                 <MovementForm product={product} type={panel} onFinished={closePanel} />
               )}
-              {panel === 'PRICES' && <PricesForm product={product} onFinished={closePanel} />}
               {panel === 'HISTORY' && <HistoryList inventoryItemId={product.inventoryItemId} />}
             </div>
           </td>
@@ -219,97 +213,6 @@ function MovementForm({
       <div className="flex gap-2">
         <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
           {isPending ? 'Guardando...' : `Registrar ${isEntry ? 'entrada' : 'salida'}`}
-        </button>
-        <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={onFinished} disabled={isPending}>
-          Cancelar
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function PricesForm({ product, onFinished }: { product: InventoryProduct; onFinished: () => void }) {
-  const router = useRouter();
-  const feedback = useFeedback();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setErrorMessage(null);
-
-    startTransition(async () => {
-      const result = await updateInventoryPrices(product.inventoryItemId, {
-        costPrice: Number(formData.get('costPrice')),
-        price: Number(formData.get('price')),
-      });
-
-      if (!result.success) {
-        setErrorMessage(result.error);
-        return;
-      }
-
-      const label = formatProductLabel(result.data);
-      const { updatedOrdersCount } = result.data;
-      const priceChanged = result.data.price !== product.price;
-
-      feedback.success(
-        !priceChanged
-          ? `Precios de "${label}" actualizados`
-          : updatedOrdersCount > 0
-            ? `Precios de "${label}" actualizados. Se recalcularon ${updatedOrdersCount} venta(s) pendiente(s) con el nuevo precio`
-            : `Precios de "${label}" actualizados. Ninguna venta pendiente tenia el precio anterior`,
-      );
-      router.refresh();
-      onFinished();
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <p className="text-sm font-semibold text-brand-600">Precios: {formatProductLabel(product)}</p>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className={LABEL_CLASS} htmlFor={`cost-${product.inventoryItemId}`}>
-            Precio real (costo)
-          </label>
-          <input
-            id={`cost-${product.inventoryItemId}`}
-            name="costPrice"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="any"
-            required
-            defaultValue={product.costPrice}
-            className={INPUT_CLASS}
-          />
-        </div>
-        <div>
-          <label className={LABEL_CLASS} htmlFor={`price-${product.inventoryItemId}`}>
-            Precio de venta
-          </label>
-          <input
-            id={`price-${product.inventoryItemId}`}
-            name="price"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="any"
-            required
-            defaultValue={product.price}
-            className={INPUT_CLASS}
-          />
-        </div>
-      </div>
-
-      {errorMessage && <FeedbackMessage tone="error" message={errorMessage} />}
-
-      <div className="flex gap-2">
-        <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
-          {isPending ? 'Guardando...' : 'Guardar precios'}
         </button>
         <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={onFinished} disabled={isPending}>
           Cancelar

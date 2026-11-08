@@ -10,7 +10,7 @@ import { ActionResult } from '@/lib/action-result';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
 import { calculateShippingPrice } from '@/lib/shipping';
 import { readShippingRate } from '@/lib/shipping-rate';
-import { InsufficientStockError, OrderNotFoundError, ValidationError } from '@/lib/errors';
+import { OrderNotFoundError, ValidationError } from '@/lib/errors';
 import { applyStockChange } from '@/lib/inventory-movements';
 import { assertOwnsInventory, resolveActingOwnerId, resolveOwnerFilter } from '@/lib/inventory-scope';
 import type { SessionPayload } from '@/lib/jwt';
@@ -117,9 +117,10 @@ export async function getDeliveries(): Promise<ActionResult<OrderWithItems[]>> {
 }
 
 /**
- * Registra la venta y descuenta el stock dentro de una unica transaccion.
+ * Registra la venta y descuenta el stock dentro de una unica transaccion. Se puede vender sin stock: el inventario
+ * queda en negativo hasta que se registre la entrada de mercancia.
  * El precio unitario se toma del catalogo (nunca del cliente) para evitar manipulacion de totales.
- * Los productos deben pertenecer al inventario del vendedor.
+ * Los productos deben estar en el inventario del vendedor.
  */
 export async function createOrder(input: OrderInput): Promise<ActionResult<OrderWithItems>> {
   return executeAction('orders.createOrder', async (trace) => {
@@ -406,8 +407,8 @@ function holdsStock(status: DeliveryStatus): boolean {
 
 /**
  * Fija precios y costos de cada linea. El precio es, en orden: el indicado en la venta, el ya pactado (al editar,
- * para que cambiar el inventario no altere ventas existentes) o el actual del inventario del vendedor. El costo
- * sigue la misma regla. Solo se admiten productos que esten en el inventario del vendedor.
+ * para que cambiar el catalogo no altere ventas existentes) o el actual del catalogo. El costo sigue la misma regla.
+ * Solo se admiten productos que esten en el inventario del vendedor.
  */
 async function buildOrderItems(
   transaction: TransactionClient,
@@ -417,6 +418,7 @@ async function buildOrderItems(
 ) {
   const inventoryItems = await transaction.inventoryItem.findMany({
     where: { ownerId: sellerId, productId: { in: requestedItems.map((item) => item.productId) } },
+    include: { product: { select: { price: true, costPrice: true } } },
   });
   const itemsByProduct = new Map(inventoryItems.map((item) => [item.productId, item]));
 
@@ -430,8 +432,8 @@ async function buildOrderItems(
     return {
       productId: item.productId,
       quantity: item.quantity,
-      unitPrice: item.unitPrice ?? agreed.prices.get(item.productId) ?? inventoryItem.price,
-      unitCost: agreed.costs.get(item.productId) ?? inventoryItem.costPrice,
+      unitPrice: item.unitPrice ?? agreed.prices.get(item.productId) ?? inventoryItem.product.price,
+      unitCost: agreed.costs.get(item.productId) ?? inventoryItem.product.costPrice,
     };
   });
 
@@ -453,7 +455,8 @@ interface StockSync {
 
 /**
  * Ajusta el stock solo por la diferencia entre lo reservado antes y despues, por producto: si baja se devuelve
- * al inventario y si sube se descuenta. Cada cambio deja su movimiento con motivo.
+ * al inventario y si sube se descuenta (aunque no alcance: el stock puede quedar en negativo). Cada cambio deja
+ * su movimiento con motivo.
  */
 async function syncStock(transaction: TransactionClient, sync: StockSync): Promise<void> {
   const deltas = new Map<string, number>();
@@ -466,8 +469,7 @@ async function syncStock(transaction: TransactionClient, sync: StockSync): Promi
     deltas.set(item.productId, (deltas.get(item.productId) ?? 0) - item.quantity);
   }
 
-  // Primero las devoluciones, para que el stock devuelto ya este disponible al descontar otras lineas.
-  const changes = [...deltas].filter(([, delta]) => delta !== 0).sort((first, second) => second[1] - first[1]);
+  const changes = [...deltas].filter(([, delta]) => delta !== 0);
 
   if (changes.length === 0) {
     return;
@@ -475,7 +477,6 @@ async function syncStock(transaction: TransactionClient, sync: StockSync): Promi
 
   const inventoryItems = await transaction.inventoryItem.findMany({
     where: { ownerId: sync.sellerId, productId: { in: changes.map(([productId]) => productId) } },
-    include: { product: { select: { name: true } } },
   });
   const itemsByProduct = new Map(inventoryItems.map((item) => [item.productId, item]));
 
@@ -486,18 +487,15 @@ async function syncStock(transaction: TransactionClient, sync: StockSync): Promi
       throw new ValidationError('Uno de los productos de la venta ya no esta en el inventario del vendedor');
     }
 
-    const stock = await applyStockChange(transaction, {
+    await applyStockChange(transaction, {
       inventoryItemId: inventoryItem.id,
       delta,
       type: delta > 0 ? 'SALE_RETURN' : 'SALE',
       reason: delta > 0 ? sync.returnReason : sync.saleReason,
       userId: sync.userId,
       orderId: sync.orderId,
+      allowNegative: true,
     });
-
-    if (stock === null) {
-      throw new InsufficientStockError(inventoryItem.product.name, inventoryItem.stock);
-    }
   }
 }
 

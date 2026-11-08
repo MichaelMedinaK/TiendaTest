@@ -32,7 +32,7 @@ interface OrderLine {
   quantity: number;
   /** Precio por unidad que se cobra en esta venta; como texto para poder escribirlo con comodidad. */
   unitPrice: string;
-  /** El precio se cambio a mano: solo entonces se envia; si no, manda el que tiene el inventario. */
+  /** El precio se cambio a mano: solo entonces se envia; si no, manda el del catalogo. */
   hasCustomPrice: boolean;
 }
 
@@ -79,7 +79,7 @@ const createEmptyLine = (products: InventoryProduct[]): OrderLine => ({
   hasCustomPrice: false,
 });
 
-/** Al editar, una linea solo queda como precio manual si no coincide con el precio actual del inventario. */
+/** Al editar, una linea solo queda como precio manual si no coincide con el precio actual del catalogo. */
 const createLinesFromOrder = (order: OrderWithItems, products: InventoryProduct[]): OrderLine[] => {
   const inventoryPrices = new Map(
     products.filter((product) => product.ownerId === order.sellerId).map((product) => [product.id, product.price]),
@@ -198,7 +198,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
       deliveryStatus: isEditing ? (formData.get('deliveryStatus') as DeliveryStatus) : 'PENDING',
       items: lines
         .filter((line) => line.productId)
-        // Sin precio manual no se envia ninguno: el servidor cobra el que tiene el inventario.
+        // Sin precio manual no se envia ninguno: el servidor cobra el del catalogo.
         .map(({ productId, quantity, unitPrice, hasCustomPrice }) => ({
           productId,
           quantity,
@@ -527,7 +527,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
                         })
                       }
                     >
-                      {line.hasCustomPrice ? 'Usar el del inventario' : 'Cambiar precio'}
+                      {line.hasCustomPrice ? 'Usar el del catalogo' : 'Cambiar precio'}
                     </button>
                   </div>
                   <input
@@ -554,7 +554,6 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
                     aria-label={`Cantidad ${index + 1}`}
                     type="number"
                     min={1}
-                    max={availableStock}
                     className={INPUT_CLASS}
                     value={line.quantity}
                     onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })}
@@ -579,6 +578,13 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
                   {formatCurrency((Number(line.unitPrice) || 0) * line.quantity)}
                 </strong>
               </p>
+
+              {availableStock !== undefined && line.quantity > availableStock && (
+                <p className="text-xs font-medium text-amber-600">
+                  Hay {Math.max(availableStock, 0)} en stock: la venta se registra igual y el stock quedara en{' '}
+                  {availableStock - line.quantity} hasta que repongas mercancia.
+                </p>
+              )}
 
               {differsFromCatalog && selectedProduct && (
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">

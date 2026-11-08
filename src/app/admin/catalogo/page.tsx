@@ -19,7 +19,8 @@ export default async function CatalogPage() {
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Catalogo</h1>
         <p className="text-sm text-slate-500">
-          Productos generales: cada vendedor los agrega a su inventario con su propio costo, precio y stock
+          Productos y precios generales: solo el administrador los define; cada vendedor agrega a su inventario los
+          que vende, con su propio stock
         </p>
       </header>
 

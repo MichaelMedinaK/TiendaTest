@@ -1,6 +1,6 @@
 // Copia el catalogo general de productos de una base a otra (por ejemplo: local -> produccion).
 //
-// Solo copia nombre y SKU: el stock, el costo y el precio de venta son de cada inventario y no se copian.
+// Solo copia nombre, SKU y precios (real y de venta): el stock es de cada inventario y no se copia.
 // Nunca borra ni desactiva nada en el destino: solo crea los productos que faltan y actualiza
 // los que ya existen. Se puede ejecutar varias veces (es idempotente).
 //
@@ -136,6 +136,8 @@ async function main(): Promise<void> {
       const data = {
         name: product.name,
         sku: product.sku,
+        costPrice: product.costPrice,
+        price: product.price,
         isActive: product.isActive,
       };
 
