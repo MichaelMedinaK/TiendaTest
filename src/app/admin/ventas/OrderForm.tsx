@@ -232,14 +232,6 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
     });
   };
 
-  if (products.length === 0) {
-    return (
-      <div className={CARD_CLASS}>
-        <FeedbackMessage tone="error" message="Registra productos en el inventario antes de vender" />
-      </div>
-    );
-  }
-
   return (
     <form onSubmit={handleSubmit} className={`${CARD_CLASS} space-y-4`}>
       <h2 className="text-lg font-semibold text-slate-900">{isEditing ? 'Editar venta' : 'Registrar nueva venta'}</h2>
@@ -478,6 +470,14 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
           <FeedbackMessage tone="error" message="Este vendedor no tiene productos en su inventario" />
         )}
 
+        {lines.length === 0 && (
+          <p className="rounded-xl border border-dashed border-slate-300 p-3 text-xs text-slate-500">
+            {isDelivery
+              ? 'Pedido sin productos: se cobrara solo el delivery. Indica los kilometros para calcular el envio.'
+              : 'Agrega un producto. Un pedido sin productos solo se admite con envio a domicilio.'}
+          </p>
+        )}
+
         {lines.map((line, index) => {
           const selectedProduct = productsById.get(line.productId);
           const availableStock = selectedProduct
@@ -560,16 +560,14 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
                   />
                 </div>
 
-                {lines.length > 1 && (
-                  <button
-                    type="button"
-                    aria-label={`Quitar producto ${index + 1}`}
-                    className={SECONDARY_BUTTON_CLASS}
-                    onClick={() => removeLine(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  aria-label={`Quitar producto ${index + 1}`}
+                  className={SECONDARY_BUTTON_CLASS}
+                  onClick={() => removeLine(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
 
               <p className="text-xs text-slate-500">
@@ -617,7 +615,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
               Cancelar
             </button>
           )}
-          <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending || sellerProducts.length === 0}>
+          <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
             {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Registrar venta'}
           </button>
         </div>

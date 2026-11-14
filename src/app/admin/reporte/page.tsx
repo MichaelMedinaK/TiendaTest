@@ -29,6 +29,7 @@ import {
 import { getCurrentSession } from '@/lib/session';
 import { getBalance, getPaidAmount } from '@/lib/payments-view';
 
+import { PdfDownload } from './PdfDownload';
 import { PrintButton } from './PrintButton';
 
 export const dynamic = 'force-dynamic';
@@ -111,6 +112,8 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
         </div>
         <PrintButton />
       </header>
+
+      <PdfDownload owner={isAdmin ? selectedOwner : undefined} />
 
       {isAdmin && <OwnerSelect owners={owners} value={selectedOwner ?? 'ALL'} includeAll label="Reporte de" />}
 

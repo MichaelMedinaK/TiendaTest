@@ -9,6 +9,10 @@ interface OrderItemView {
 
 /** Detalle de productos de una venta: "cantidad x Producto - SKU", precio unitario y total segun la cantidad. */
 export function OrderItemsList({ items, className = 'text-xs' }: { items: OrderItemView[]; className?: string }) {
+  if (items.length === 0) {
+    return <p className={`italic text-slate-500 ${className}`}>Solo delivery (sin productos)</p>;
+  }
+
   return (
     <ul className={`w-full space-y-1.5 text-slate-600 ${className}`}>
       {items.map((item) => (

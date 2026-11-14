@@ -37,6 +37,14 @@ export function getStoreDayKey(offsetDays = 0, now: Date = new Date()): string {
   return shifted.toISOString().slice(0, 10);
 }
 
+/** Dia AAAA-MM-DD en que ocurrio una fecha segun la zona horaria de la tienda. */
+export function toStoreDay(date: Date): string {
+  const parts = DAY_KEY_FORMATTER.formatToParts(date);
+  const partValue = (type: 'year' | 'month' | 'day') => parts.find((part) => part.type === type)?.value ?? '00';
+
+  return `${partValue('year')}-${partValue('month')}-${partValue('day')}`;
+}
+
 export function formatCurrency(amount: number): string {
   return `${CURRENCY_SYMBOL} ${AMOUNT_FORMATTER.format(amount)}`;
 }

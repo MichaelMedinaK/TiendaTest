@@ -170,6 +170,8 @@ Al guardarse, el stock de cada producto se descuenta automáticamente **del inve
 
 **Sobre los precios:** cada línea toma sola el **precio de venta** que el producto tiene en el catálogo, así que no hay que escribirlo. Si en esa venta quieres cobrar otro valor, pulsa **Cambiar precio** sobre la línea y escríbelo (**Usar el del catálogo** lo devuelve al automático). El precio cobrado queda congelado en la venta: cambiarlo después en el catálogo no altera las ventas ya registradas (salvo las pendientes que aún tenían el precio anterior, que se recalculan).
 
+**Pedido solo delivery (sin productos):** en una venta con **Envío a domicilio**, quita todas las líneas de producto con el botón de la papelera y calcula los kilómetros. El pedido cobra únicamente el envío, no toca el stock y se marca como *Solo delivery (sin productos)*. Sin productos solo se admite si el envío tiene un precio mayor a cero.
+
 **Si no hay stock suficiente** la venta se registra igual: el formulario te avisa que el stock quedará en negativo hasta que registres la entrada de mercancía.
 
 ### Editar una venta
@@ -226,7 +228,15 @@ En **Reporte** se resume el estado de la tienda: ventas registradas, total vendi
 - La **ganancia** es venta de productos − costo registrado al vender; no incluye el envío ni las ventas canceladas.
 - El **ADMIN** puede filtrar por inventario con el selector **Reporte de** (por defecto, todos) y ve un **resumen por vendedor**. Un STAFF solo ve su propio reporte.
 
-Pulsa **Imprimir / Guardar PDF** y, en el diálogo de impresión del navegador, elige **Guardar como PDF** como destino.
+Pulsa **Descargar PDF** para bajar el reporte como archivo. Antes puedes elegir **Desde** y **Hasta** para limitarlo a un periodo (si los dejas vacíos, incluye todo el historial). Cada usuario descarga el PDF de sus propios pedidos y productos; el ADMIN descarga el del inventario elegido en **Reporte de**.
+
+El PDF incluye:
+
+- **Resumen:** pedidos y cancelados, total vendido, ticket promedio, venta de productos, delivery cobrado, unidades vendidas, costo y ganancia.
+- **Dinero recogido:** total cobrado en **efectivo** y por **transferencia**, y lo que queda por cobrar (solo cobros vigentes de los pedidos del periodo).
+- **Estado** de envíos y de pagos, **productos vendidos** (unidades y monto), el detalle de cada **pedido** (productos, envío, cobrado y saldo), el **resumen por vendedor** (ADMIN con todos los inventarios) y el **inventario** con el stock bajo.
+
+También puedes usar **Imprimir / Guardar PDF** para imprimir la pantalla del reporte desde el navegador.
 
 ---
 

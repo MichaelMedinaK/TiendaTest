@@ -362,6 +362,16 @@ function parseOrderInput(input: OrderInput) {
   const isDelivery = deliveryMethod === DeliveryMethod.DELIVERY;
   const distanceKm = isDelivery ? optionalNonNegativeNumber(input.distanceKm, 'kilometros') : null;
 
+  const shippingPrice = calculateShippingPrice(distanceKm ?? 0, readShippingRate());
+  const items = mergeDuplicatedItems(input.items);
+
+  // Sin productos solo se admite el pedido que cobra unicamente el delivery.
+  if (items.length === 0 && !(isDelivery && shippingPrice > 0)) {
+    throw new ValidationError(
+      'Agrega al menos un producto, o registra un envio a domicilio con kilometros para cobrar solo el delivery',
+    );
+  }
+
   return {
     fields: {
       reference: requireText(input.reference, 'referencia', 200),
@@ -371,11 +381,11 @@ function parseOrderInput(input: OrderInput) {
       ...parseSchedule(input),
       distanceKm,
       // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado hacia arriba.
-      shippingPrice: calculateShippingPrice(distanceKm ?? 0, readShippingRate()),
+      shippingPrice,
       paymentMethod: requireEnumValue(input.paymentMethod, PaymentMethod, 'metodo de pago'),
       deliveryStatus: requireEnumValue(input.deliveryStatus, DeliveryStatus, 'estado de envio'),
     },
-    items: mergeDuplicatedItems(input.items),
+    items,
   };
 }
 
@@ -500,8 +510,8 @@ async function syncStock(transaction: TransactionClient, sync: StockSync): Promi
 }
 
 function mergeDuplicatedItems(items: OrderItemInput[]): ParsedOrderItem[] {
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new ValidationError('La venta debe incluir al menos un producto');
+  if (!Array.isArray(items)) {
+    throw new ValidationError('Los productos de la venta no son validos');
   }
 
   // Un mismo producto con precios distintos se mantiene como lineas separadas.
