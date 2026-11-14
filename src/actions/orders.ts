@@ -363,14 +363,8 @@ function parseOrderInput(input: OrderInput) {
   const distanceKm = isDelivery ? optionalNonNegativeNumber(input.distanceKm, 'kilometros') : null;
 
   const shippingPrice = calculateShippingPrice(distanceKm ?? 0, readShippingRate());
+  // Un pedido puede ir sin productos (por ejemplo, solo delivery).
   const items = mergeDuplicatedItems(input.items);
-
-  // Sin productos solo se admite el pedido que cobra unicamente el delivery.
-  if (items.length === 0 && !(isDelivery && shippingPrice > 0)) {
-    throw new ValidationError(
-      'Agrega al menos un producto, o registra un envio a domicilio con kilometros para cobrar solo el delivery',
-    );
-  }
 
   return {
     fields: {

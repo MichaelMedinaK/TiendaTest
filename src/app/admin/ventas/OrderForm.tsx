@@ -472,9 +472,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
 
         {lines.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 p-3 text-xs text-slate-500">
-            {isDelivery
-              ? 'Pedido sin productos: se cobrara solo el delivery. Indica los kilometros para calcular el envio.'
-              : 'Agrega un producto. Un pedido sin productos solo se admite con envio a domicilio.'}
+            Pedido sin productos: se registra igual y no mueve stock.
+            {isDelivery && ' Indica los kilometros para cobrar el delivery.'}
           </p>
         )}
 

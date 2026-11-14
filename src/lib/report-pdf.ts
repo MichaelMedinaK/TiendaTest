@@ -244,7 +244,7 @@ function orderDetails(order: OrderWithItems): string[] {
   );
 
   if (order.items.length === 0) {
-    lines.push('Solo delivery (sin productos)');
+    lines.push('Pedido sin productos');
   }
 
   if (order.shippingPrice > 0) {

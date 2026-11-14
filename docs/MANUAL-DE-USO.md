@@ -170,7 +170,7 @@ Al guardarse, el stock de cada producto se descuenta automáticamente **del inve
 
 **Sobre los precios:** cada línea toma sola el **precio de venta** que el producto tiene en el catálogo, así que no hay que escribirlo. Si en esa venta quieres cobrar otro valor, pulsa **Cambiar precio** sobre la línea y escríbelo (**Usar el del catálogo** lo devuelve al automático). El precio cobrado queda congelado en la venta: cambiarlo después en el catálogo no altera las ventas ya registradas (salvo las pendientes que aún tenían el precio anterior, que se recalculan).
 
-**Pedido solo delivery (sin productos):** en una venta con **Envío a domicilio**, quita todas las líneas de producto con el botón de la papelera y calcula los kilómetros. El pedido cobra únicamente el envío, no toca el stock y se marca como *Solo delivery (sin productos)*. Sin productos solo se admite si el envío tiene un precio mayor a cero.
+**Pedido sin productos:** quita todas las líneas de producto con el botón de la papelera y registra la venta. No toca el stock y se marca como *Pedido sin productos*. Con **Envío a domicilio** y los kilómetros calculados, cobra únicamente el envío.
 
 **Si no hay stock suficiente** la venta se registra igual: el formulario te avisa que el stock quedará en negativo hasta que registres la entrada de mercancía.
 
@@ -228,7 +228,7 @@ En **Reporte** se resume el estado de la tienda: ventas registradas, total vendi
 - La **ganancia** es venta de productos − costo registrado al vender; no incluye el envío ni las ventas canceladas.
 - El **ADMIN** puede filtrar por inventario con el selector **Reporte de** (por defecto, todos) y ve un **resumen por vendedor**. Un STAFF solo ve su propio reporte.
 
-Pulsa **Descargar PDF** para bajar el reporte como archivo. Antes puedes elegir **Desde** y **Hasta** para limitarlo a un periodo (si los dejas vacíos, incluye todo el historial). Cada usuario descarga el PDF de sus propios pedidos y productos; el ADMIN descarga el del inventario elegido en **Reporte de**.
+Pulsa **Descargar PDF** para bajar el reporte como archivo. Antes puedes elegir el periodo con los accesos rápidos (**Hoy**, **Ayer**, **Mañana**, **Últimos 7 días**, **Este mes**, **Todo**) o con las fechas **Desde** y **Hasta** (si los dejas vacíos, incluye todo el historial). Cada usuario descarga el PDF de sus propios pedidos y productos; el ADMIN descarga el del inventario elegido en **Reporte de**.
 
 El PDF incluye:
 
