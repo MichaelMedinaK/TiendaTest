@@ -19,7 +19,7 @@ import {
   SECONDARY_BUTTON_CLASS,
 } from '@/components/ui/styles';
 import { calculateShippingPrice, type ShippingRate } from '@/lib/shipping';
-import { formatCurrency, formatProductLabel, formatUserLabel } from '@/lib/format';
+import { formatCurrency, formatProductLabel, formatUserLabel, getStoreDayKey } from '@/lib/format';
 import {
   DELIVERY_METHOD_LABELS,
   DELIVERY_STATUS_LABELS,
@@ -54,6 +54,12 @@ const DELIVERY_METHOD_OPTIONS = toSelectOptions(DELIVERY_METHOD_LABELS);
 const DEFAULT_DELIVERY_METHOD: DeliveryMethod = 'PICKUP';
 const PAYMENT_METHOD_OPTIONS = toSelectOptions(PAYMENT_METHOD_LABELS);
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
+
+const QUICK_DATES = [
+  { label: 'Ayer', offset: -1 },
+  { label: 'Hoy', offset: 0 },
+  { label: 'Manana', offset: 1 },
+];
 
 /** Duracion por defecto de la ventana de entrega: la hora "hasta" sale 30 minutos despues de la "desde". */
 const DEFAULT_SLOT_MINUTES = 30;
@@ -109,6 +115,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(order?.deliveryMethod ?? DEFAULT_DELIVERY_METHOD);
   const [distanceKm, setDistanceKm] = useState<string>(order?.distanceKm != null ? String(order.distanceKm) : '');
+  const [scheduledDate, setScheduledDate] = useState(order?.scheduledDate?.toISOString().slice(0, 10) ?? '');
   const [scheduledFrom, setScheduledFrom] = useState(order?.scheduledFrom ?? '');
   const [scheduledTo, setScheduledTo] = useState(order?.scheduledTo ?? '');
   const [isPaid, setIsPaid] = useState(false);
@@ -218,6 +225,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         form.reset();
         setDeliveryMethod(DEFAULT_DELIVERY_METHOD);
         setDistanceKm('');
+        setScheduledDate('');
         setScheduledFrom('');
         setScheduledTo('');
         setIsPaid(false);
@@ -366,9 +374,31 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
             id="scheduledDate"
             name="scheduledDate"
             type="date"
-            defaultValue={order?.scheduledDate?.toISOString().slice(0, 10) ?? ''}
+            value={scheduledDate}
+            onChange={(event) => setScheduledDate(event.target.value)}
             className={INPUT_CLASS}
           />
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Fechas rapidas">
+            {QUICK_DATES.map(({ label, offset }) => {
+              const value = getStoreDayKey(offset);
+
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={scheduledDate === value}
+                  onClick={() => setScheduledDate(value)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    scheduledDate === value
+                      ? 'border-pink-400 bg-pink-50 text-pink-700'
+                      : 'border-brand-200 bg-white text-slate-700 hover:border-pink-300 hover:bg-pink-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

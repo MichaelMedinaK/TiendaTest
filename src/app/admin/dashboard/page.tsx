@@ -16,7 +16,7 @@ import { SalesBoard } from './SalesBoard';
 // La lista depende de la sesion y cambia con cada venta: nunca se cachea.
 export const dynamic = 'force-dynamic';
 
-type DayKey = 'actuales' | 'ayer' | 'hoy' | 'manana' | 'todas';
+type DayKey = 'pendientes' | 'actuales' | 'ayer' | 'hoy' | 'manana' | 'todas';
 
 interface DayFilter {
   key: DayKey;
@@ -24,10 +24,13 @@ interface DayFilter {
   title: string;
   /** Dias respecto a hoy; sin valor, el filtro no se limita a un dia concreto. */
   offset?: number;
+  /** Solo ventas actuales (sin cerrar), sin importar el dia. */
+  onlyCurrent?: boolean;
 }
 
 const DAY_FILTERS: DayFilter[] = [
-  { key: 'actuales', label: 'Actuales', title: 'Ventas actuales' },
+  { key: 'pendientes', label: 'Pendientes de hoy', title: 'Ventas pendientes de hoy', offset: 0, onlyCurrent: true },
+  { key: 'actuales', label: 'Actuales', title: 'Ventas actuales', onlyCurrent: true },
   { key: 'ayer', label: 'Ayer', title: 'Ventas de ayer', offset: -1 },
   { key: 'hoy', label: 'Hoy', title: 'Ventas de hoy', offset: 0 },
   { key: 'manana', label: 'Manana', title: 'Ventas de manana', offset: 1 },
@@ -101,8 +104,8 @@ export default async function DashboardPage({
   const targetDay = dayFilter.offset === undefined ? null : getStoreDayKey(dayFilter.offset);
 
   const matchesDay = (order: OrderWithItems): boolean => {
-    if (dayFilter.key === DEFAULT_DAY_FILTER.key) {
-      return isCurrentOrder(order);
+    if (dayFilter.onlyCurrent && !isCurrentOrder(order)) {
+      return false;
     }
 
     return targetDay === null || order.scheduledDate?.toISOString().slice(0, 10) === targetDay;
@@ -112,8 +115,8 @@ export default async function DashboardPage({
     .filter((order) => matchesDay(order) && (!statusFilter || order.deliveryStatus === statusFilter))
     .sort(compareBySchedule);
 
-  // Las ventas cerradas (canceladas, entregadas y cobradas) no estan en "Actuales": al elegir un estado se busca entre todas.
-  const dayForStatusLinks = dayFilter.key === DEFAULT_DAY_FILTER.key ? 'todas' : dayFilter.key;
+  // Las ventas cerradas (canceladas, entregadas y cobradas) no estan en las vistas de pendientes: al elegir un estado se busca entre todas.
+  const dayForStatusLinks = dayFilter.onlyCurrent ? 'todas' : dayFilter.key;
 
   return (
     <section className="space-y-6">
