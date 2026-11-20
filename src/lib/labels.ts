@@ -31,6 +31,8 @@ export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
   EXIT: 'Salida',
   SALE: 'Venta',
   SALE_RETURN: 'Devolucion por venta',
+  TRANSFER_OUT: 'Transferencia enviada',
+  TRANSFER_IN: 'Transferencia recibida',
 };
 
 export const ROLE_LABELS: Record<Role, string> = {

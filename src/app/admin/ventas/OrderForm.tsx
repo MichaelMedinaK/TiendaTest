@@ -118,6 +118,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
   const [scheduledDate, setScheduledDate] = useState(order?.scheduledDate?.toISOString().slice(0, 10) ?? '');
   const [scheduledFrom, setScheduledFrom] = useState(order?.scheduledFrom ?? '');
   const [scheduledTo, setScheduledTo] = useState(order?.scheduledTo ?? '');
+  const [extraAmount, setExtraAmount] = useState<string>(order?.extraAmount ? String(order.extraAmount) : '');
   const [isPaid, setIsPaid] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isQuoting, startQuoting] = useTransition();
@@ -145,7 +146,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
   const itemsTotal = lines.reduce((accumulated, line) => accumulated + (Number(line.unitPrice) || 0) * line.quantity, 0);
   // Mismo calculo que el servidor (km x tarifa); el servidor es quien fija el valor definitivo.
   const shippingAmount = isDelivery ? calculateShippingPrice(Number(distanceKm) || 0, shippingRate) : 0;
-  const estimatedTotal = itemsTotal + shippingAmount;
+  const estimatedTotal = itemsTotal + shippingAmount + (Number(extraAmount) || 0);
 
   const updateLine = (index: number, changes: Partial<OrderLine>) => {
     setLines((currentLines) =>
@@ -198,6 +199,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
       scheduledFrom: String(formData.get('scheduledFrom') ?? ''),
       scheduledTo: String(formData.get('scheduledTo') ?? ''),
       distanceKm,
+      extraAmount,
       paymentMethod: formData.get('paymentMethod') as PaymentMethod,
       // Al crear solo se indica si ya se cobro todo (se registra el cobro por el total); los cobros parciales se
       // registran despues desde Cobros. El envio siempre parte como nuevo.
@@ -225,6 +227,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         form.reset();
         setDeliveryMethod(DEFAULT_DELIVERY_METHOD);
         setDistanceKm('');
+        setExtraAmount('');
         setScheduledDate('');
         setScheduledFrom('');
         setScheduledTo('');
@@ -367,6 +370,26 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         </div>
 
         <div>
+          <label className={LABEL_CLASS} htmlFor="extraAmount">
+            Monto a cobrar (aparte de productos y envio)
+          </label>
+          <input
+            id="extraAmount"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="any"
+            value={extraAmount}
+            onChange={(event) => setExtraAmount(event.target.value)}
+            className={INPUT_CLASS}
+            placeholder="Ej. 150 (opcional)"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Para un tramite de cobro: el domiciliario va, cobra este monto y el envio. Se suma al total.
+          </p>
+        </div>
+
+        <div>
           <label className={LABEL_CLASS} htmlFor="scheduledDate">
             {isDelivery ? 'Fecha de entrega' : 'Fecha de recogida'}
           </label>
@@ -503,7 +526,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         {lines.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 p-3 text-xs text-slate-500">
             Pedido sin productos: se registra igual y no mueve stock.
-            {isDelivery && ' Indica los kilometros para cobrar el delivery.'}
+            {isDelivery && ' Indica los kilometros para cobrar el delivery.'} Puedes indicar un monto a cobrar aparte.
           </p>
         )}
 

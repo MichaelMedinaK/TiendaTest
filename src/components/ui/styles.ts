@@ -1,17 +1,18 @@
 /** Clases Tailwind compartidas: un unico punto de cambio para el look & feel. */
-export const CARD_CLASS = 'rounded-xl border border-brand-100 bg-white p-5 shadow-md shadow-brand-200/40';
+export const CARD_CLASS =
+  'rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50 dark:shadow-none';
 
 export const LABEL_CLASS = 'mb-1 block text-sm font-medium text-slate-700';
 
 export const INPUT_CLASS =
-  'w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 disabled:bg-slate-100';
+  'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:disabled:bg-zinc-800/60';
 
-/** Degradado azul a rosa; para un boton de otro color (p. ej. eliminar) se anula con `!bg-none`. */
+/** Unico color de acento (indigo); para un boton de otro color (p. ej. eliminar) se anula con `!bg-*`. */
 export const PRIMARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-brand-700 hover:to-pink-600 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60';
 
 export const SECONDARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-pink-300 hover:bg-pink-50 hover:text-pink-700 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-zinc-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800';
 
 export const TABLE_CLASS = 'min-w-full divide-y divide-slate-200 text-sm';
 

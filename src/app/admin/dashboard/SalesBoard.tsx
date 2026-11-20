@@ -15,7 +15,7 @@ import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { BADGE_CLASS, CARD_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { NEW_SALE_ANCHOR } from '@/lib/constants';
-import { formatCurrency, formatSchedule, formatScheduleDay, formatShipping, formatUserLabel } from '@/lib/format';
+import { formatCurrency, formatExtraAmount, formatSchedule, formatScheduleDay, formatShipping, formatUserLabel } from '@/lib/format';
 import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
 import type { ShippingRate } from '@/lib/shipping';
 
@@ -117,6 +117,9 @@ export function SalesBoard({
                     {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
                   </span>
                   {formatShipping(order) && <span className="text-xs text-slate-500">{formatShipping(order)}</span>}
+                  {formatExtraAmount(order) && (
+                    <span className="text-xs font-semibold text-brand-800">{formatExtraAmount(order)}</span>
+                  )}
                 </div>
 
                 <OrderItemsList items={order.items} />

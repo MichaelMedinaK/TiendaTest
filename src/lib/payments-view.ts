@@ -15,6 +15,21 @@ export function getPaidAmount(payments: PaymentLike[]): number {
   );
 }
 
+/** Lo cobrado por cada metodo (efectivo, transferencia...), sin contar cobros anulados; omite los metodos sin cobros. */
+export function getPaidByMethod<TMethod extends string>(
+  payments: (PaymentLike & { method: TMethod })[],
+): { method: TMethod; amount: number }[] {
+  const totals = new Map<TMethod, number>();
+
+  for (const payment of payments) {
+    if (!payment.voidedAt) {
+      totals.set(payment.method, (totals.get(payment.method) ?? 0) + payment.amount);
+    }
+  }
+
+  return [...totals].map(([method, amount]) => ({ method, amount: roundToCents(amount) }));
+}
+
 /** Saldo por cobrar (nunca negativo). */
 export function getBalance(total: number, payments: PaymentLike[]): number {
   return Math.max(0, roundToCents(total - getPaidAmount(payments)));

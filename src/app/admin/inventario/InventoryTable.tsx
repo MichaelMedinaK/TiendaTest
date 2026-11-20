@@ -35,6 +35,8 @@ import { LOW_STOCK_THRESHOLD } from '@/lib/constants';
 import { formatCurrency, formatDateTime, formatProductLabel } from '@/lib/format';
 import { MOVEMENT_TYPE_LABELS } from '@/lib/labels';
 
+import { SalePriceForm } from './SalePriceForm';
+
 const COLUMN_COUNT = 2;
 
 type Panel = 'ENTRY' | 'EXIT' | 'HISTORY';
@@ -87,7 +89,10 @@ function ProductRow({ product }: { product: InventoryProduct }) {
             <div className="space-y-4">
               <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Detail label="Precio real">{formatCurrency(product.costPrice)}</Detail>
-                <Detail label="Precio de venta">{formatCurrency(product.price)}</Detail>
+                <Detail label="Precio de venta">
+                  {formatCurrency(product.price)}
+                  {product.customSalePrice === null && <span className="block text-xs font-normal text-slate-500">del catalogo</span>}
+                </Detail>
                 <Detail label="Margen">{formatCurrency(product.price - product.costPrice)}</Detail>
                 <Detail label="Stock">
                   <span
@@ -97,6 +102,8 @@ function ProductRow({ product }: { product: InventoryProduct }) {
                   </span>
                 </Detail>
               </dl>
+
+              <SalePriceForm product={product} />
 
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => togglePanel('ENTRY')}>

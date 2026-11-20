@@ -40,7 +40,9 @@ export interface ReportSummary {
   productsRevenue: number;
   productsCost: number;
   shippingRevenue: number;
-  /** Productos + envio de los pedidos no cancelados. */
+  /** Montos a cobrar aparte de productos y envio (tramites de cobro) de los pedidos no cancelados. */
+  extraRevenue: number;
+  /** Productos + envio + montos a cobrar de los pedidos no cancelados. */
   totalSold: number;
   collectedTotal: number;
   collectedByMethod: Record<PaymentMethod, number>;
@@ -151,6 +153,7 @@ export function buildReportSummary(orders: OrderWithItems[], products: Inventory
     productsRevenue: roundToCents(productsRevenue),
     productsCost: roundToCents(sumBy(active, itemsCost)),
     shippingRevenue: roundToCents(shippingRevenue),
+    extraRevenue: roundToCents(sumBy(active, (order) => order.extraAmount)),
     totalSold,
     collectedTotal: roundToCents(sumBy(orders, (order) => getPaidAmount(order.payments))),
     collectedByMethod: collectedByMethod(orders),

@@ -251,6 +251,10 @@ function orderDetails(order: OrderWithItems): string[] {
     lines.push(`Envio: ${formatCurrency(order.shippingPrice)}`);
   }
 
+  if (order.extraAmount > 0) {
+    lines.push(`Monto a cobrar: ${formatCurrency(order.extraAmount)}`);
+  }
+
   return lines;
 }
 
@@ -275,6 +279,7 @@ export async function buildReportPdf(input: ReportPdfInput): Promise<Uint8Array>
     ['Ticket promedio', formatCurrency(summary.averageTicket)],
     ['Venta de productos', formatCurrency(summary.productsRevenue)],
     ['Delivery cobrado en envios', formatCurrency(summary.shippingRevenue)],
+    ['Montos a cobrar (tramites)', formatCurrency(summary.extraRevenue)],
     ['Unidades vendidas', String(summary.unitsSold)],
     ['Pedidos solo delivery', String(summary.deliveryOnlyCount)],
     ['Costo de lo vendido', formatCurrency(summary.productsCost)],

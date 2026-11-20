@@ -22,6 +22,8 @@ export const NEW_SALE_ANCHOR = 'nueva-venta';
 /** Anclas de los formularios de alta de inventario y usuarios; las usa el acceso rapido "+ Nuevo ...". */
 export const NEW_PRODUCT_ANCHOR = 'nuevo-producto';
 export const NEW_MOVEMENT_ANCHOR = 'entrada-salida';
+export const NEW_TRANSFER_ANCHOR = 'transferir-stock';
+export const RESELLER_PRICES_ANCHOR = 'precios-revendedores';
 export const NEW_USER_ANCHOR = 'nuevo-usuario';
 
 /** Los mensajes del chat dejan de verse y se borran pasado este tiempo. */

@@ -121,12 +121,13 @@
   }
 
   .dark body {
-    background-color: #000;
+    background-color: #09090b;
     background-image: none;
   }
 
-  /* Superficies (tarjetas, campos, botones secundarios, notificaciones). `text-white` se mantiene blanco. */
-  .dark .bg-white {
+  /* Superficies (tarjetas, campos, botones secundarios, notificaciones). `text-white` se mantiene blanco.
+     `:where` deja la especificidad baja para que un `dark:bg-*` explicito prevalezca. */
+  :where(.dark) .bg-white {
     background-color: #0b0b0b;
   }
 }

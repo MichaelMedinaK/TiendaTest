@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 
+import { getMyResellers } from '@/actions/pricing';
 import { getAvailableCatalog, getInventoryOwners, getManualMovements, getProducts } from '@/actions/products';
+import { getTransferPartners } from '@/actions/transfers';
 import { OwnerSelect } from '@/components/OwnerSelect';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
@@ -23,11 +25,13 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   // Un tendero siempre ve su inventario; el administrador puede elegir el de cualquier usuario.
   const isAdmin = session.role === 'ADMIN';
   const ownerId = isAdmin && duenio && duenio !== 'ALL' ? duenio : session.userId;
-  const [ownersResult, productsResult, catalogResult, movementsResult] = await Promise.all([
+  const [ownersResult, productsResult, catalogResult, movementsResult, partnersResult, resellersResult] = await Promise.all([
     getInventoryOwners(),
     getProducts(ownerId),
     getAvailableCatalog(ownerId),
     getManualMovements(ownerId),
+    getTransferPartners(),
+    getMyResellers(),
   ]);
 
   if (!productsResult.success) {
@@ -45,6 +49,11 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   if (!movementsResult.success) {
     return <FeedbackMessage tone="error" message={movementsResult.error} />;
   }
+
+  // Transferir y fijar costos se hace desde el inventario propio, no al mirar el de otro usuario.
+  const isOwnInventory = ownerId === session.userId;
+  const partners = isOwnInventory && partnersResult.success ? partnersResult.data : [];
+  const resellers = isOwnInventory && resellersResult.success ? resellersResult.data : [];
 
   const owner = ownersResult.data.find((candidate) => candidate.id === ownerId);
 
@@ -64,6 +73,8 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
         catalog={catalogResult.data}
         products={productsResult.data}
         movements={movementsResult.data}
+        partners={partners}
+        resellers={resellers}
       />
       <InventoryTable products={productsResult.data} />
     </section>

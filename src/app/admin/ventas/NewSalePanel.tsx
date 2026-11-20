@@ -17,7 +17,7 @@ interface NewSalePanelProps {
 /** Formulario de nueva venta oculto hasta pulsar "Nueva venta". */
 export function NewSalePanel({ products, shippingRate, sellers, currentUserId }: NewSalePanelProps) {
   return (
-    <FormPanel anchorId={NEW_SALE_ANCHOR} label="Nueva venta">
+    <FormPanel anchorId={NEW_SALE_ANCHOR} label="Nueva venta" showButton={false}>
       {(close) => (
         <OrderForm
           products={products}

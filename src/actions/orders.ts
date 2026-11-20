@@ -12,6 +12,7 @@ import { calculateShippingPrice } from '@/lib/shipping';
 import { readShippingRate } from '@/lib/shipping-rate';
 import { OrderNotFoundError, ValidationError } from '@/lib/errors';
 import { applyStockChange } from '@/lib/inventory-movements';
+import { effectiveCostPrice, effectiveSalePrice } from '@/lib/inventory-prices';
 import { assertOwnsInventory, resolveActingOwnerId, resolveOwnerFilter } from '@/lib/inventory-scope';
 import type { SessionPayload } from '@/lib/jwt';
 import { assertCanHandleOrder, canHandleAnyOrder } from '@/lib/order-access';
@@ -60,6 +61,8 @@ export interface OrderInput {
   scheduledTo?: string;
   /** Solo aplica al envio a domicilio. El precio del envio se calcula: kilometros x tarifa por km. */
   distanceKm?: string | number;
+  /** Monto a cobrar aparte de productos y envio (p. ej. un tramite de cobro); vacio o 0 si no hay. */
+  extraAmount?: string | number;
   paymentMethod: PaymentMethod;
   /** Solo al registrar: si ya se cobro todo, se crea el cobro por el total con el metodo indicado. */
   isPaid?: boolean;
@@ -144,7 +147,7 @@ export async function createOrder(input: OrderInput): Promise<ActionResult<Order
         saleReason: 'Venta registrada',
       });
 
-      const orderTotal = withShipping(total, orderData.fields.shippingPrice);
+      const orderTotal = withCharges(total, orderData.fields);
       const isPaid = input.isPaid === true && holdsStock(orderData.fields.deliveryStatus);
 
       return transaction.order.create({
@@ -221,7 +224,7 @@ export async function updateOrder(orderId: string, input: OrderInput): Promise<A
         where: { id: orderId },
         data: {
           ...orderData.fields,
-          total: withShipping(total, orderData.fields.shippingPrice),
+          total: withCharges(total, orderData.fields),
           items: { deleteMany: {}, create: orderItems },
         },
       });
@@ -376,6 +379,7 @@ function parseOrderInput(input: OrderInput) {
       distanceKm,
       // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado hacia arriba.
       shippingPrice,
+      extraAmount: roundToCents(optionalNonNegativeNumber(input.extraAmount, 'monto a cobrar') ?? 0),
       paymentMethod: requireEnumValue(input.paymentMethod, PaymentMethod, 'metodo de pago'),
       deliveryStatus: requireEnumValue(input.deliveryStatus, DeliveryStatus, 'estado de envio'),
     },
@@ -411,7 +415,8 @@ function holdsStock(status: DeliveryStatus): boolean {
 
 /**
  * Fija precios y costos de cada linea. El precio es, en orden: el indicado en la venta, el ya pactado (al editar,
- * para que cambiar el catalogo no altere ventas existentes) o el actual del catalogo. El costo sigue la misma regla.
+ * para que cambiar el catalogo no altere ventas existentes) o el actual del inventario del vendedor (su precio propio
+ * o, si no tiene, el del catalogo). El costo sigue la misma regla con el costo del vendedor.
  * Solo se admiten productos que esten en el inventario del vendedor.
  */
 async function buildOrderItems(
@@ -422,7 +427,7 @@ async function buildOrderItems(
 ) {
   const inventoryItems = await transaction.inventoryItem.findMany({
     where: { ownerId: sellerId, productId: { in: requestedItems.map((item) => item.productId) } },
-    include: { product: { select: { price: true, costPrice: true } } },
+    include: { product: { select: { price: true, costPrice: true } }, owner: { select: { role: true } } },
   });
   const itemsByProduct = new Map(inventoryItems.map((item) => [item.productId, item]));
 
@@ -436,8 +441,10 @@ async function buildOrderItems(
     return {
       productId: item.productId,
       quantity: item.quantity,
-      unitPrice: item.unitPrice ?? agreed.prices.get(item.productId) ?? inventoryItem.product.price,
-      unitCost: agreed.costs.get(item.productId) ?? inventoryItem.product.costPrice,
+      unitPrice: item.unitPrice ?? agreed.prices.get(item.productId) ?? effectiveSalePrice(inventoryItem, inventoryItem.product),
+      unitCost:
+        agreed.costs.get(item.productId) ??
+        effectiveCostPrice(inventoryItem, inventoryItem.product, inventoryItem.owner.role),
     };
   });
 
@@ -532,9 +539,9 @@ function roundToCents(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
 
-/** El total de la venta incluye el precio de envio escrito a mano. */
-function withShipping(itemsTotal: number, shippingPrice: number): number {
-  return roundToCents(itemsTotal + shippingPrice);
+/** El total de la venta suma productos, precio de envio y el monto a cobrar aparte. */
+function withCharges(itemsTotal: number, { shippingPrice, extraAmount }: { shippingPrice: number; extraAmount: number }): number {
+  return roundToCents(itemsTotal + shippingPrice + extraAmount);
 }
 
 function revalidateSalesViews(): void {

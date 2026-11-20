@@ -10,6 +10,8 @@ export interface StockChange {
   reason: string;
   userId: string;
   orderId?: string;
+  /** Une la salida y la entrada de una transferencia entre inventarios. */
+  transferId?: string;
   /** Las ventas pueden dejar el stock en negativo (se vende sin stock y se repone despues). */
   allowNegative?: boolean;
 }
@@ -49,6 +51,7 @@ export async function applyStockChange(
       reason: change.reason,
       userId: change.userId,
       orderId: change.orderId,
+      transferId: change.transferId,
     },
   });
 

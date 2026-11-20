@@ -4,10 +4,11 @@ import { Power, PowerOff, Truck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 
-import { type UserSummary, setCourierProfile, toggleUserStatus } from '@/actions/users';
+import { type UserSummary, setCourierProfile, setUserSupplier, toggleUserStatus } from '@/actions/users';
 import {
   BADGE_CLASS,
   CARD_CLASS,
+  INPUT_CLASS,
   SECONDARY_BUTTON_CLASS,
   STACKED_CELL_CLASS,
   STACKED_GROUP_CLASS,
@@ -19,12 +20,21 @@ import {
   TABLE_HEAD_CELL_CLASS,
 } from '@/components/ui/styles';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatUserLabel } from '@/lib/format';
 import { ROLE_LABELS } from '@/lib/labels';
 
+import type { SupplierOption } from './NewUserForm';
 import { ResetPasswordControl } from './ResetPasswordControl';
 
-export function UsersTable({ users, currentUserId }: { users: UserSummary[]; currentUserId: string | null }) {
+export function UsersTable({
+  users,
+  suppliers,
+  currentUserId,
+}: {
+  users: UserSummary[];
+  suppliers: SupplierOption[];
+  currentUserId: string | null;
+}) {
   if (users.length === 0) {
     return <div className={`${CARD_CLASS} text-sm text-slate-500`}>No hay usuarios registrados.</div>;
   }
@@ -43,14 +53,22 @@ export function UsersTable({ users, currentUserId }: { users: UserSummary[]; cur
           </tr>
         </thead>
         {users.map((user) => (
-          <UserRow key={user.id} user={user} isCurrentUser={user.id === currentUserId} />
+          <UserRow key={user.id} user={user} suppliers={suppliers} isCurrentUser={user.id === currentUserId} />
         ))}
       </table>
     </div>
   );
 }
 
-function UserRow({ user, isCurrentUser }: { user: UserSummary; isCurrentUser: boolean }) {
+function UserRow({
+  user,
+  suppliers,
+  isCurrentUser,
+}: {
+  user: UserSummary;
+  suppliers: SupplierOption[];
+  isCurrentUser: boolean;
+}) {
   const router = useRouter();
   const feedback = useFeedback();
   const [isPending, startTransition] = useTransition();
@@ -95,6 +113,24 @@ function UserRow({ user, isCurrentUser }: { user: UserSummary; isCurrentUser: bo
     });
   };
 
+  const handleSupplierChange = (supplierId: string) => {
+    startTransition(async () => {
+      const result = await setUserSupplier(user.id, supplierId || null);
+
+      if (!result.success) {
+        feedback.error(result.error);
+        return;
+      }
+
+      feedback.success(
+        result.data.supplier
+          ? `${user.email} ahora lo abastece ${formatUserLabel(result.data.supplier)}`
+          : `${user.email} quedo sin tendero asignado`,
+      );
+      router.refresh();
+    });
+  };
+
   return (
     <tbody className={STACKED_GROUP_CLASS}>
       <tr className={STACKED_ROW_CLASS}>
@@ -110,6 +146,22 @@ function UserRow({ user, isCurrentUser }: { user: UserSummary; isCurrentUser: bo
         <td data-label="Rol" className={STACKED_CELL_CLASS}>
           {ROLE_LABELS[user.role]}
           {user.isCourier && <span className="block text-xs text-sky-700">+ Domiciliario</span>}
+          {user.role === 'RESELLER' && (
+            <select
+              aria-label={`Tendero que abastece a ${user.email}`}
+              className={`${INPUT_CLASS} mt-1 py-1 text-xs`}
+              disabled={isPending}
+              value={user.supplier?.id ?? ''}
+              onChange={(event) => handleSupplierChange(event.target.value)}
+            >
+              <option value="">Sin tendero asignado</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  Tendero: {formatUserLabel(supplier)}
+                </option>
+              ))}
+            </select>
+          )}
         </td>
         <td data-label="Estado" className={STACKED_CELL_CLASS}>
           <span className={`${BADGE_CLASS} ${user.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>

@@ -15,6 +15,11 @@ export default async function UsersPage() {
     return <FeedbackMessage tone="error" message={result.error} />;
   }
 
+  // Quien puede abastecer a un revendedor: tenderos y administradores activos.
+  const suppliers = result.data
+    .filter((user) => user.isActive && (user.role === 'STAFF' || user.role === 'ADMIN'))
+    .map(({ id, name, email }) => ({ id, name, email }));
+
   return (
     <section className="space-y-6">
       <header>
@@ -22,8 +27,8 @@ export default async function UsersPage() {
         <p className="text-sm text-slate-500">Crea cuentas y controla el acceso al panel</p>
       </header>
 
-      <NewUserForm />
-      <UsersTable users={result.data} currentUserId={session?.userId ?? null} />
+      <NewUserForm suppliers={suppliers} />
+      <UsersTable users={result.data} suppliers={suppliers} currentUserId={session?.userId ?? null} />
     </section>
   );
 }

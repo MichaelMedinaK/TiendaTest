@@ -15,6 +15,7 @@ import { LOW_STOCK_THRESHOLD } from '@/lib/constants';
 import {
   formatCurrency,
   formatDateTime,
+  formatExtraAmount,
   formatProductLabel,
   formatSchedule,
   formatShipping,
@@ -27,7 +28,7 @@ import {
   PAYMENT_STATUS_LABELS,
 } from '@/lib/labels';
 import { getCurrentSession } from '@/lib/session';
-import { getBalance, getPaidAmount } from '@/lib/payments-view';
+import { getBalance, getPaidAmount, getPaidByMethod } from '@/lib/payments-view';
 
 import { PdfDownload } from './PdfDownload';
 import { PrintButton } from './PrintButton';
@@ -80,12 +81,14 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
   const profitableOrders = orders.filter((order) => order.deliveryStatus !== DeliveryStatus.CANCELLED);
   const productsRevenue = profitableOrders.reduce((accumulated, order) => accumulated + itemsRevenue(order), 0);
   const productsCost = profitableOrders.reduce((accumulated, order) => accumulated + itemsCost(order), 0);
+  const extraAmountTotal = profitableOrders.reduce((accumulated, order) => accumulated + order.extraAmount, 0);
 
   const summary = [
     { label: 'Ventas registradas', value: String(orders.length) },
     { label: 'Total vendido', value: formatCurrency(totalSales) },
     { label: 'Cobrado', value: formatCurrency(collectedAmount) },
     { label: 'Por cobrar', value: formatCurrency(pendingAmount) },
+    { label: 'Montos a cobrar (tramites)', value: formatCurrency(extraAmountTotal) },
     { label: 'Costo de lo vendido', value: formatCurrency(productsCost) },
     { label: 'Ganancia (sin envios ni cancelados)', value: formatCurrency(productsRevenue - productsCost) },
     { label: 'Unidades en stock', value: String(stockUnits) },
@@ -252,9 +255,10 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
                     {order.address ? ` - ${order.address}` : ''}
                     {formatSchedule(order) && <span className="block text-xs text-slate-500">{formatSchedule(order)}</span>}
                     {formatShipping(order) && <span className="block text-xs text-slate-500">{formatShipping(order)}</span>}
+                    {formatExtraAmount(order) && <span className="block text-xs text-slate-500">{formatExtraAmount(order)}</span>}
                   </td>
                   <td className={TABLE_CELL_CLASS}>
-                    {PAYMENT_METHOD_LABELS[order.paymentMethod]} - {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+                    {paymentMethodsText(order)} - {PAYMENT_STATUS_LABELS[order.paymentStatus]}
                   </td>
                   <td className={TABLE_CELL_CLASS}>{DELIVERY_STATUS_LABELS[order.deliveryStatus]}</td>
                   <td className={`${TABLE_CELL_CLASS} font-semibold`}>{formatCurrency(order.total)}</td>
@@ -278,6 +282,17 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
       </div>
     </section>
   );
+}
+
+/** Metodos con los que se cobro ("Efectivo S/ 10.00 + Transferencia S/ 20.00"); sin cobros, el metodo previsto. */
+function paymentMethodsText(order: OrderWithItems): string {
+  const paidByMethod = getPaidByMethod(order.payments);
+
+  if (paidByMethod.length === 0) {
+    return PAYMENT_METHOD_LABELS[order.paymentMethod];
+  }
+
+  return paidByMethod.map(({ method, amount }) => `${PAYMENT_METHOD_LABELS[method]} ${formatCurrency(amount)}`).join(' + ');
 }
 
 function sumTotals(orders: { total: number }[]): number {

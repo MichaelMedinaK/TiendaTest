@@ -77,6 +77,60 @@ export async function registerPayment(orderId: string, input: PaymentInput): Pro
   });
 }
 
+/**
+ * Corrige un cobro vigente (importe, metodo o nota), por ejemplo si se registro mal el metodo o el monto.
+ * Quien lo recibio y la fecha no cambian; el importe no puede dejar el total cobrado por encima del total de la venta.
+ */
+export async function updatePayment(paymentId: string, input: PaymentInput): Promise<ActionResult<OrderWithItems>> {
+  return executeAction('payments.update', async (trace) => {
+    const session = await requireSession();
+    trace.setBusinessId(paymentId);
+
+    const amount = roundToCents(requirePositiveNumber(input.amount, 'importe'));
+    const method = requireEnumValue(input.method, PaymentMethod, 'metodo de pago');
+    const note = optionalText(input.note, 200);
+
+    const order = await prisma.$transaction(async (transaction) => {
+      const payment = await transaction.payment.findUnique({
+        where: { id: paymentId },
+        include: { order: { include: { payments: true } } },
+      });
+
+      if (!payment) {
+        throw new ValidationError('No se encontro el cobro');
+      }
+
+      if (payment.voidedAt) {
+        throw new ValidationError('No se puede modificar un cobro anulado');
+      }
+
+      assertCanHandleOrder(session, payment.order.sellerId);
+
+      if (payment.order.deliveryStatus === DeliveryStatus.CANCELLED) {
+        throw new ValidationError('No se puede modificar un cobro de un pedido cancelado');
+      }
+
+      const otherPayments = payment.order.payments.filter(({ id }) => id !== paymentId);
+      const availableBalance = getBalance(payment.order.total, otherPayments);
+
+      if (amount > availableBalance) {
+        throw new ValidationError(`El cobro supera lo que falta por cobrar de la venta (${availableBalance})`);
+      }
+
+      await transaction.payment.update({ where: { id: paymentId }, data: { amount, method, note } });
+      await refreshPaymentStatus(transaction, payment.orderId);
+
+      trace.addStep(`cobro-modificado:${payment.amount}:${payment.method}->${amount}:${method}`);
+
+      return transaction.order.findUniqueOrThrow({ where: { id: payment.orderId }, include: ORDER_WITH_ITEMS });
+    });
+
+    revalidatePaymentViews();
+
+    return order;
+  });
+}
+
 /** Anula un cobro registrado por error. Queda en el historial con su motivo y deja de contar para el saldo. */
 export async function voidPayment(paymentId: string, reason: string): Promise<ActionResult<OrderWithItems>> {
   return executeAction('payments.void', async (trace) => {

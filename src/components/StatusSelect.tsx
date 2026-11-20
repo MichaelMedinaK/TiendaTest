@@ -16,6 +16,8 @@ interface StatusSelectProps<TValue extends string> {
   options: SelectOption<TValue>[];
   ariaLabel: string;
   onChangeAction: (nextValue: TValue) => Promise<ActionResult<unknown>>;
+  /** Reemplaza el estilo por defecto del select (p. ej. colores segun el estado elegido). */
+  getSelectClassName?: (value: TValue) => string;
 }
 
 /**
@@ -27,6 +29,7 @@ export function StatusSelect<TValue extends string>({
   options,
   ariaLabel,
   onChangeAction,
+  getSelectClassName,
 }: StatusSelectProps<TValue>) {
   const [selectedValue, setSelectedValue] = useState<TValue>(value);
   const [isPending, startTransition] = useTransition();
@@ -50,10 +53,10 @@ export function StatusSelect<TValue extends string>({
   };
 
   return (
-    <div className="md:min-w-[9.5rem]">
+    <div className={getSelectClassName ? undefined : 'md:min-w-[9.5rem]'}>
       <select
         aria-label={ariaLabel}
-        className={`${INPUT_CLASS} py-1.5`}
+        className={getSelectClassName ? getSelectClassName(selectedValue) : `${INPUT_CLASS} py-1.5`}
         disabled={isPending}
         value={selectedValue}
         onChange={(event) => handleChange(event.target.value as TValue)}

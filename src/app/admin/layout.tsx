@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const homeHref = ROLE_HOME_ROUTE[session.role];
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col bg-zinc-50 md:flex-row dark:bg-zinc-950">
       <MobileMenu
         role={session.role}
         userName={session.name ?? session.email}
@@ -30,37 +30,34 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         homeHref={homeHref}
       />
 
-      <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-brand-100 bg-gradient-to-b from-brand-50 to-pink-50 p-4 md:flex print:hidden">
+      <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-zinc-200 bg-white p-4 md:flex dark:border-zinc-800 dark:bg-zinc-900/50 print:hidden">
         <div>
           <Link
             href={homeHref}
             aria-label="Ir al inicio"
-            className="mb-6 flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-pink-100/70"
+            className="mb-6 flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-pink-500 text-white shadow-sm">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
               <Store className="h-5 w-5" />
             </span>
-            <span className="bg-gradient-to-r from-brand-500 to-pink-500 bg-clip-text text-lg font-bold text-transparent">
-              Tienda Test
-            </span>
+            <span className="text-lg font-semibold text-zinc-900 dark:text-white">Tienda Test</span>
           </Link>
-          <QuickAddButton variant="sidebar" />
           <SidebarNavigation role={session.role} />
         </div>
 
-        <div className="space-y-2 border-t border-brand-200 pt-4">
-          <p className="px-2 text-sm font-semibold text-slate-800">{session.name ?? session.email}</p>
-          <p className="px-2 pb-1 text-xs text-slate-500">{ROLE_LABELS[session.role]}</p>
+        <div className="space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <p className="px-2 text-sm font-semibold text-zinc-900 dark:text-white">{session.name ?? session.email}</p>
+          <p className="px-2 pb-1 text-xs text-zinc-500 dark:text-zinc-400">{ROLE_LABELS[session.role]}</p>
           <ThemeToggle variant="sidebar" />
           <LogoutButton />
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 p-4 pb-24 sm:p-6 md:pb-6">
+      <main className="min-w-0 flex-1 p-4 pb-24 sm:p-6 sm:pb-24">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
 
-      <QuickAddButton variant="floating" />
+      <QuickAddButton />
     </div>
   );
 }

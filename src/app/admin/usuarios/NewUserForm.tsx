@@ -13,21 +13,29 @@ import { useFeedback } from '@/components/ui/FeedbackProvider';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { CARD_CLASS, INPUT_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { NEW_USER_ANCHOR } from '@/lib/constants';
+import { formatUserLabel } from '@/lib/format';
 import { ROLE_LABELS, toSelectOptions } from '@/lib/labels';
 
 const ROLE_OPTIONS = toSelectOptions(ROLE_LABELS);
 
-export function NewUserForm() {
+export interface SupplierOption {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+export function NewUserForm({ suppliers }: { suppliers: SupplierOption[] }) {
   return (
     <FormPanel anchorId={NEW_USER_ANCHOR} label="Nuevo usuario">
-      {(close) => <UserForm onDone={close} />}
+      {(close) => <UserForm suppliers={suppliers} onDone={close} />}
     </FormPanel>
   );
 }
 
-function UserForm({ onDone }: { onDone: () => void }) {
+function UserForm({ suppliers, onDone }: { suppliers: SupplierOption[]; onDone: () => void }) {
   const router = useRouter();
   const toast = useFeedback();
+  const [role, setRole] = useState<Role>('STAFF');
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -42,8 +50,9 @@ function UserForm({ onDone }: { onDone: () => void }) {
         name: String(formData.get('name') ?? ''),
         email: String(formData.get('email') ?? ''),
         password: String(formData.get('password') ?? ''),
-        role: formData.get('role') as Role,
+        role,
         isCourier: formData.get('isCourier') === 'on',
+        supplierId: role === 'RESELLER' ? String(formData.get('supplierId') ?? '') : undefined,
       });
 
       if (!result.success) {
@@ -95,7 +104,13 @@ function UserForm({ onDone }: { onDone: () => void }) {
           <label className={LABEL_CLASS} htmlFor="role">
             Rol
           </label>
-          <select id="role" name="role" className={INPUT_CLASS} defaultValue="STAFF">
+          <select
+            id="role"
+            name="role"
+            className={INPUT_CLASS}
+            value={role}
+            onChange={(event) => setRole(event.target.value as Role)}
+          >
             {ROLE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -103,6 +118,22 @@ function UserForm({ onDone }: { onDone: () => void }) {
             ))}
           </select>
         </div>
+
+        {role === 'RESELLER' && (
+          <div>
+            <label className={LABEL_CLASS} htmlFor="supplierId">
+              Tendero que lo abastece
+            </label>
+            <select id="supplierId" name="supplierId" className={INPUT_CLASS} defaultValue="">
+              <option value="">Sin asignar</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {formatUserLabel(supplier)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
           <input type="checkbox" name="isCourier" className="mt-0.5 h-4 w-4" />

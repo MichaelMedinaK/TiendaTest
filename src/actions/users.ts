@@ -10,6 +10,7 @@ import {
   ForbiddenError,
   IncorrectCurrentPasswordError,
   UserNotFoundError,
+  ValidationError,
 } from '@/lib/errors';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
@@ -32,6 +33,8 @@ export interface UserSummary {
   role: Role;
   isActive: boolean;
   isCourier: boolean;
+  /** Tendero que abastece al revendedor (null si no tiene o no es revendedor). */
+  supplier: { id: string; name: string | null; email: string } | null;
   createdAt: Date;
 }
 
@@ -42,6 +45,8 @@ export interface CreateUserInput {
   role: Role;
   /** Perfil adicional de domiciliario; solo aplica a tenderos y revendedores. */
   isCourier?: boolean;
+  /** Solo revendedores: el tendero que lo abastece. */
+  supplierId?: string;
 }
 
 const USER_SUMMARY_SELECT = {
@@ -51,12 +56,29 @@ const USER_SUMMARY_SELECT = {
   role: true,
   isActive: true,
   isCourier: true,
+  supplier: { select: { id: true, name: true, email: true } },
   createdAt: true,
 } as const;
 
 /** Solo quienes venden pueden sumar el perfil de domiciliario: el admin ya lo puede todo y el domiciliario ya lo es. */
 function canHaveCourierProfile(role: Role): boolean {
   return role === Role.STAFF || role === Role.RESELLER;
+}
+
+/** El abastecedor de un revendedor es un tendero (o el administrador) activo y distinto de el. */
+async function requireValidSupplier(supplierId: string, resellerId?: string): Promise<void> {
+  const supplier = await prisma.user.findUnique({
+    where: { id: supplierId },
+    select: { isActive: true, role: true },
+  });
+
+  if (!supplier || !supplier.isActive || (supplier.role !== Role.STAFF && supplier.role !== Role.ADMIN)) {
+    throw new ValidationError('El abastecedor debe ser un tendero (o administrador) activo');
+  }
+
+  if (supplierId === resellerId) {
+    throw new ValidationError('Un revendedor no puede abastecerse a si mismo');
+  }
 }
 
 export async function getUsers(): Promise<ActionResult<UserSummary[]>> {
@@ -81,6 +103,7 @@ export async function createUser(input: CreateUserInput): Promise<ActionResult<U
     const password = requirePassword(input.password);
     const role = requireEnumValue(input.role, Role, 'rol');
     const name = optionalText(input.name);
+    const supplierId = role === Role.RESELLER ? optionalText(input.supplierId, 100) : null;
     trace.setBusinessId(email);
     trace.addStep('datos-validados');
 
@@ -90,11 +113,16 @@ export async function createUser(input: CreateUserInput): Promise<ActionResult<U
       throw new EmailAlreadyRegisteredError(email);
     }
 
+    if (supplierId) {
+      await requireValidSupplier(supplierId);
+    }
+
     const createdUser = await prisma.user.create({
       data: {
         email,
         name,
         role,
+        supplierId,
         isCourier: canHaveCourierProfile(role) && input.isCourier === true,
         password: await hashPassword(password),
       },
@@ -134,6 +162,42 @@ export async function toggleUserStatus(userId: string, isActive: boolean): Promi
     trace.addStep(`estado-actualizado:${isActive ? 'ACTIVO' : 'INACTIVO'}`);
 
     revalidatePath(USERS_ROUTE);
+    return updatedUser;
+  });
+}
+
+/** Asigna (o quita con null) el tendero que abastece a un revendedor. */
+export async function setUserSupplier(userId: string, supplierId: string | null): Promise<ActionResult<UserSummary>> {
+  return executeAction('users.setUserSupplier', async (trace) => {
+    await requireAdminSession();
+    trace.setBusinessId(userId);
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+
+    if (!targetUser) {
+      throw new UserNotFoundError(userId);
+    }
+
+    if (targetUser.role !== Role.RESELLER) {
+      throw new ForbiddenError('Solo un revendedor tiene tendero que lo abastece');
+    }
+
+    const nextSupplierId = optionalText(supplierId, 100);
+
+    if (nextSupplierId) {
+      await requireValidSupplier(nextSupplierId, userId);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { supplierId: nextSupplierId },
+      select: USER_SUMMARY_SELECT,
+    });
+
+    trace.addStep(`abastecedor:${nextSupplierId ?? 'NINGUNO'}`);
+
+    revalidatePath(USERS_ROUTE);
+    revalidatePath('/admin/inventario');
     return updatedUser;
   });
 }

@@ -10,7 +10,7 @@ import { OrderItemsList } from '@/components/OrderItemsList';
 import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { CARD_CLASS } from '@/components/ui/styles';
-import { formatDateTime, formatSchedule, formatShipping } from '@/lib/format';
+import { formatDateTime, formatExtraAmount, formatSchedule, formatShipping } from '@/lib/format';
 import { DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
 
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
@@ -44,6 +44,9 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
           <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
 
           {formatShipping(order) && <p className="text-sm font-medium text-brand-800">{formatShipping(order)}</p>}
+          {formatExtraAmount(order) && (
+            <p className="text-sm font-semibold text-brand-800">{formatExtraAmount(order)}</p>
+          )}
 
           <OrderItemsList items={order.items} className="text-sm" />
 

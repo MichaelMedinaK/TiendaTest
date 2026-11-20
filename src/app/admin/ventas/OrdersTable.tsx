@@ -1,42 +1,103 @@
 'use client';
 
-import { Pencil, Trash2 } from 'lucide-react';
+import { Clock, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-import type { DeliveryStatus } from '@prisma/client';
+import type { DeliveryStatus, PaymentStatus } from '@prisma/client';
 
 import { type OrderWithItems, deleteOrder, updateDeliveryStatus } from '@/actions/orders';
 import type { InventoryProduct } from '@/actions/products';
-import { DeliveryHighlight } from '@/components/DeliveryHighlight';
-import { OrderItemsList } from '@/components/OrderItemsList';
-import { PaymentsPanel, PaymentsSummary } from '@/components/PaymentsControl';
+import { PaidByMethod, PaymentsPanel } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { useFeedback } from '@/components/ui/FeedbackProvider';
+import { CARD_CLASS } from '@/components/ui/styles';
 import {
-  BADGE_CLASS,
-  CARD_CLASS,
-  SECONDARY_BUTTON_CLASS,
-  STACKED_CELL_CLASS,
-  STACKED_EDIT_CELL_CLASS,
-  STACKED_EDIT_ROW_CLASS,
-  STACKED_GROUP_ACTIVE_CLASS,
-  STACKED_GROUP_CLASS,
-  STACKED_HEAD_CLASS,
-  STACKED_ROW_CLASS,
-  STACKED_TABLE_LARGE_CLASS,
-  STACKED_TITLE_CELL_LARGE_CLASS,
-  STACKED_WRAPPER_CLASS,
-  TABLE_HEAD_CELL_CLASS,
-} from '@/components/ui/styles';
-import { formatCurrency, formatDateTime, formatSchedule, formatShipping, formatUserLabel } from '@/lib/format';
-import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
+  formatCurrency,
+  formatDateTime,
+  formatExtraAmount,
+  formatProductLabel,
+  formatSchedule,
+  formatShipping,
+  formatUserLabel,
+} from '@/lib/format';
+import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
+import { getBalance, getPaidAmount } from '@/lib/payments-view';
 import type { ShippingRate } from '@/lib/shipping';
 
 import { OrderForm } from './OrderForm';
 
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 const COLUMN_COUNT = 7;
+const ALL = 'ALL';
+
+type PaymentFilter = typeof ALL | PaymentStatus;
+type DeliveryFilter = typeof ALL | DeliveryStatus;
+
+const PAYMENT_FILTER_OPTIONS: { value: PaymentFilter; label: string }[] = [
+  { value: ALL, label: 'Todos' },
+  { value: 'PAID', label: 'Pagado' },
+  { value: 'PENDING', label: 'Pendiente' },
+  { value: 'PARTIAL', label: 'Parcial' },
+];
+
+const DELIVERY_FILTER_OPTIONS: { value: DeliveryFilter; label: string }[] = [
+  { value: ALL, label: 'Todos' },
+  ...DELIVERY_STATUS_OPTIONS,
+];
+
+const PAYMENT_BADGES: Record<PaymentStatus, { label: string; className: string }> = {
+  PENDING: {
+    label: 'Pendiente',
+    className: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  },
+  PARTIAL: {
+    label: 'Parcial',
+    className: 'border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+  },
+  PAID: {
+    label: 'Pagado',
+    className: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  },
+};
+
+const DELIVERY_SELECT_TONES: Record<DeliveryStatus, string> = {
+  PENDING: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  PACKED: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+  IN_TRANSIT: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  DELIVERED: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  CANCELLED: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+};
+
+const MUTED_TEXT = 'text-zinc-500 dark:text-zinc-400';
+const STRONG_TEXT = 'text-zinc-900 dark:text-white';
+const HEAD_CELL_CLASS = 'px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
+const CELL_CLASS = 'px-4 py-3 align-top';
+const FILTER_CONTROL_CLASS =
+  'h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100';
+const ICON_BUTTON_CLASS =
+  'inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400';
+
+const getDeliverySelectClassName = (status: DeliveryStatus) =>
+  `h-8 w-full min-w-[7.5rem] rounded-md border px-2 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-60 ${DELIVERY_SELECT_TONES[status]}`;
+
+/** Minusculas y sin tildes para que "Peru" encuentre "Perú". */
+const normalizeText = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+function buildSearchText(order: OrderWithItems): string {
+  return normalizeText(
+    [
+      order.reference,
+      order.address ?? '',
+      formatUserLabel(order.seller),
+      ...order.items.map((item) => formatProductLabel(item.product)),
+    ].join(' '),
+  );
+}
 
 export function OrdersTable({
   orders,
@@ -53,6 +114,9 @@ export function OrdersTable({
   const router = useRouter();
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [paymentsOrderId, setPaymentsOrderId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>(ALL);
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>(ALL);
 
   // Tras persistir un cambio se refresca el server component para recalcular stock y metricas.
   const refreshAfter = async <TResult,>(action: Promise<TResult>): Promise<TResult> => {
@@ -62,109 +126,242 @@ export function OrdersTable({
   };
 
   if (orders.length === 0) {
-    return <div className={`${CARD_CLASS} text-sm text-slate-500`}>Aun no se han registrado ventas.</div>;
+    return <div className={`${CARD_CLASS} text-sm ${MUTED_TEXT}`}>Aun no se han registrado ventas.</div>;
   }
 
+  const normalizedSearch = normalizeText(searchText.trim());
+  const visibleOrders = orders.filter(
+    (order) =>
+      (paymentFilter === ALL || order.paymentStatus === paymentFilter) &&
+      (deliveryFilter === ALL || order.deliveryStatus === deliveryFilter) &&
+      (normalizedSearch === '' || buildSearchText(order).includes(normalizedSearch)),
+  );
+
   return (
-    <div className={STACKED_WRAPPER_CLASS}>
-      <table className={STACKED_TABLE_LARGE_CLASS}>
-        <thead className={STACKED_HEAD_CLASS}>
-          <tr>
-            <th className={TABLE_HEAD_CELL_CLASS}>Venta</th>
-            <th className={TABLE_HEAD_CELL_CLASS}>Fecha</th>
-            <th className={TABLE_HEAD_CELL_CLASS}>Productos</th>
-            <th className={TABLE_HEAD_CELL_CLASS}>Pago</th>
-            <th className={TABLE_HEAD_CELL_CLASS}>Total</th>
-            <th className={TABLE_HEAD_CELL_CLASS}>Envio</th>
-            <th className={TABLE_HEAD_CELL_CLASS}>Acciones</th>
-          </tr>
-        </thead>
-        {orders.map((order) => (
-          <tbody
-            key={order.id}
-            className={`${STACKED_GROUP_CLASS} ${editingOrderId === order.id ? STACKED_GROUP_ACTIVE_CLASS : ''}`}
-          >
-            <tr className={STACKED_ROW_CLASS}>
-              <td data-label="Venta" className={`${STACKED_TITLE_CELL_LARGE_CLASS} md:w-[32%] md:min-w-[15rem]`}>
-                <p>{order.reference}</p>
-                {showSeller && (
-                  <p className="text-xs font-normal text-pink-600">Vendedor: {formatUserLabel(order.seller)}</p>
-                )}
-                <p className="mb-2 mt-1">
-                  <span className={`${BADGE_CLASS} bg-pink-100 uppercase tracking-wide text-pink-700`}>
-                    {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
-                  </span>
-                </p>
-                <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
-                {formatShipping(order) && (
-                  <p className="mt-1 text-xs font-normal text-slate-500">{formatShipping(order)}</p>
-                )}
-              </td>
-              <td data-label="Fecha" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>
-                <span className="font-semibold text-slate-900">{formatDateTime(order.createdAt)}</span>
-              </td>
-              <td data-label="Productos" className={`${STACKED_CELL_CLASS} md:min-w-[12rem]`}>
-                <OrderItemsList items={order.items} className="text-[0.8125rem]" />
-              </td>
-              <td data-label="Pago" className={STACKED_CELL_CLASS}>
-                <div className="flex flex-col items-end gap-1 md:items-start">
-                  <p className="text-xs font-semibold text-brand-800">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</p>
-                  <PaymentsSummary
-                    order={order}
-                    isOpen={paymentsOrderId === order.id}
-                    onToggle={() => setPaymentsOrderId(paymentsOrderId === order.id ? null : order.id)}
-                  />
-                </div>
-              </td>
-              <td data-label="Total" className={`${STACKED_CELL_CLASS} whitespace-nowrap`}>
-                <span className="font-bold text-brand-800">{formatCurrency(order.total)}</span>
-              </td>
-              <td data-label="Envio" className={STACKED_CELL_CLASS}>
-                <StatusSelect<DeliveryStatus>
-                  ariaLabel={`Estado del envio de ${order.reference}`}
-                  value={order.deliveryStatus}
-                  options={DELIVERY_STATUS_OPTIONS}
-                  onChangeAction={(nextStatus) => refreshAfter(updateDeliveryStatus(order.id, nextStatus))}
-                />
-              </td>
-              <td data-label="Acciones" className={STACKED_CELL_CLASS}>
-                <div className="flex gap-2 md:flex-col">
-                  <button
-                    type="button"
-                    className={SECONDARY_BUTTON_CLASS}
-                    onClick={() => setEditingOrderId(editingOrderId === order.id ? null : order.id)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar
-                  </button>
-                  <DeleteOrderButton orderId={order.id} reference={order.reference} />
-                </div>
-              </td>
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="search"
+            aria-label="Buscar ventas"
+            placeholder="Buscar por direccion, cliente o producto..."
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            className={`${FILTER_CONTROL_CLASS} w-full pl-9 placeholder:text-zinc-400 dark:placeholder:text-zinc-500`}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className={`flex items-center gap-2 text-xs ${MUTED_TEXT}`}>
+            Pago
+            <select
+              className={FILTER_CONTROL_CLASS}
+              value={paymentFilter}
+              onChange={(event) => setPaymentFilter(event.target.value as PaymentFilter)}
+            >
+              {PAYMENT_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={`flex items-center gap-2 text-xs ${MUTED_TEXT}`}>
+            Envio
+            <select
+              className={FILTER_CONTROL_CLASS}
+              value={deliveryFilter}
+              onChange={(event) => setDeliveryFilter(event.target.value as DeliveryFilter)}
+            >
+              {DELIVERY_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className={`text-xs ${MUTED_TEXT}`}>
+            {visibleOrders.length} de {orders.length}
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
+        <table className="w-full min-w-[60rem] text-sm">
+          <thead className="border-b border-zinc-200 dark:border-zinc-800">
+            <tr>
+              <th className={HEAD_CELL_CLASS}>Venta / Destino</th>
+              <th className={HEAD_CELL_CLASS}>Fecha</th>
+              <th className={HEAD_CELL_CLASS}>Productos</th>
+              <th className={HEAD_CELL_CLASS}>Pago</th>
+              <th className={`${HEAD_CELL_CLASS} text-right`}>Total</th>
+              <th className={HEAD_CELL_CLASS}>Envio</th>
+              <th className={HEAD_CELL_CLASS}>Acciones</th>
             </tr>
+          </thead>
 
-            {paymentsOrderId === order.id && (
-              <tr className={STACKED_EDIT_ROW_CLASS}>
-                <td colSpan={COLUMN_COUNT} className={STACKED_EDIT_CELL_CLASS}>
-                  <PaymentsPanel order={order} />
+          {visibleOrders.length === 0 && (
+            <tbody>
+              <tr>
+                <td colSpan={COLUMN_COUNT} className={`px-4 py-8 text-center text-sm ${MUTED_TEXT}`}>
+                  Ninguna venta coincide con los filtros.
                 </td>
               </tr>
-            )}
+            </tbody>
+          )}
 
-            {editingOrderId === order.id && (
-              <tr className={STACKED_EDIT_ROW_CLASS}>
-                <td colSpan={COLUMN_COUNT} className={STACKED_EDIT_CELL_CLASS}>
-                  <OrderForm
-                    products={products}
-                    shippingRate={shippingRate}
-                    order={order}
-                    onFinished={() => setEditingOrderId(null)}
-                  />
-                </td>
-              </tr>
-            )}
-          </tbody>
-        ))}
-      </table>
+          {visibleOrders.map((order) => {
+            const schedule = formatSchedule(order);
+            const shipping = formatShipping(order);
+            const [createdDay, createdTime] = formatDateTime(order.createdAt).split(' ');
+            const paymentBadge = PAYMENT_BADGES[order.paymentStatus];
+            const paidAmount = getPaidAmount(order.payments);
+            const canCollect = getBalance(order.total, order.payments) > 0 && order.deliveryStatus !== 'CANCELLED';
+            const isPaymentsOpen = paymentsOrderId === order.id;
+
+            return (
+              <tbody
+                key={order.id}
+                className={`border-b border-zinc-200 last:border-b-0 dark:border-zinc-800 ${
+                  editingOrderId === order.id ? 'bg-indigo-500/5' : ''
+                }`}
+              >
+                <tr className="transition hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                  <td className={`${CELL_CLASS} min-w-[16rem] max-w-sm`}>
+                    <p className={`text-sm font-medium ${STRONG_TEXT}`}>{order.reference}</p>
+                    {order.address && (
+                      <p className={`mt-0.5 flex items-start gap-1 text-xs ${MUTED_TEXT}`}>
+                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>{order.address}</span>
+                      </p>
+                    )}
+                    <p className={`mt-0.5 text-xs ${MUTED_TEXT}`}>
+                      {[DELIVERY_METHOD_LABELS[order.deliveryMethod], shipping].filter(Boolean).join(' · ')}
+                    </p>
+                    {formatExtraAmount(order) && (
+                      <p className="mt-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                        {formatExtraAmount(order)}
+                      </p>
+                    )}
+                    {showSeller && (
+                      <p className="mt-0.5 text-[11px] text-zinc-500">Vendedor: {formatUserLabel(order.seller)}</p>
+                    )}
+                    {schedule && (
+                      <span className="mt-2 inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                        <Clock className="h-3 w-3" />
+                        {schedule}
+                      </span>
+                    )}
+                  </td>
+
+                  <td className={`${CELL_CLASS} whitespace-nowrap`}>
+                    <p className={`text-xs font-medium ${STRONG_TEXT}`}>{createdDay}</p>
+                    <p className={`text-xs ${MUTED_TEXT}`}>{createdTime}</p>
+                  </td>
+
+                  <td className={`${CELL_CLASS} min-w-[12rem]`}>
+                    {order.items.length === 0 ? (
+                      <p className={`text-xs italic ${MUTED_TEXT}`}>Pedido sin productos</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {order.items.map((item) => (
+                          <li key={item.id}>
+                            <p className="text-[13px] text-zinc-700 dark:text-zinc-200">
+                              <span className={`font-semibold ${STRONG_TEXT}`}>{item.quantity}x</span>{' '}
+                              {formatProductLabel(item.product)}
+                            </p>
+                            <p className={`text-xs ${MUTED_TEXT}`}>{formatCurrency(item.unitPrice)} c/u</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
+
+                  <td className={CELL_CLASS}>
+                    <div className="flex flex-col items-start gap-1">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${paymentBadge.className}`}
+                      >
+                        {paymentBadge.label}
+                      </span>
+                      <PaidByMethod order={order} className={`text-xs ${MUTED_TEXT}`} />
+                      {order.paymentStatus === 'PARTIAL' && (
+                        <p className={`text-xs ${MUTED_TEXT}`}>
+                          Cobrado {formatCurrency(paidAmount)} de {formatCurrency(order.total)}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        aria-expanded={isPaymentsOpen}
+                        className="text-xs font-medium text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                        onClick={() => setPaymentsOrderId(isPaymentsOpen ? null : order.id)}
+                      >
+                        {canCollect ? '+ Cobrar' : 'Cobros'}
+                      </button>
+                    </div>
+                  </td>
+
+                  <td className={`${CELL_CLASS} whitespace-nowrap text-right`}>
+                    <span className={`text-base font-semibold tabular-nums ${STRONG_TEXT}`}>
+                      {formatCurrency(order.total)}
+                    </span>
+                  </td>
+
+                  <td className={CELL_CLASS}>
+                    <StatusSelect<DeliveryStatus>
+                      ariaLabel={`Estado del envio de ${order.reference}`}
+                      value={order.deliveryStatus}
+                      options={DELIVERY_STATUS_OPTIONS}
+                      getSelectClassName={getDeliverySelectClassName}
+                      onChangeAction={(nextStatus) => refreshAfter(updateDeliveryStatus(order.id, nextStatus))}
+                    />
+                  </td>
+
+                  <td className={CELL_CLASS}>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        title="Editar venta"
+                        aria-label={`Editar ${order.reference}`}
+                        aria-expanded={editingOrderId === order.id}
+                        className={`${ICON_BUTTON_CLASS} hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white`}
+                        onClick={() => setEditingOrderId(editingOrderId === order.id ? null : order.id)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <DeleteOrderButton orderId={order.id} reference={order.reference} />
+                    </div>
+                  </td>
+                </tr>
+
+                {isPaymentsOpen && (
+                  <tr className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <td colSpan={COLUMN_COUNT} className="p-4">
+                      <PaymentsPanel order={order} />
+                    </td>
+                  </tr>
+                )}
+
+                {editingOrderId === order.id && (
+                  <tr className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <td colSpan={COLUMN_COUNT} className="p-4">
+                      <OrderForm
+                        products={products}
+                        shippingRate={shippingRate}
+                        order={order}
+                        onFinished={() => setEditingOrderId(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            );
+          })}
+        </table>
+      </div>
     </div>
   );
 }
@@ -198,9 +395,15 @@ function DeleteOrderButton({ orderId, reference }: { orderId: string; reference:
   };
 
   return (
-    <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isPending} onClick={handleDelete}>
-      <Trash2 className="h-4 w-4 text-rose-600" />
-      {isPending ? 'Eliminando' : 'Eliminar'}
+    <button
+      type="button"
+      title={isPending ? 'Eliminando...' : 'Eliminar venta'}
+      aria-label={`Eliminar ${reference}`}
+      className={`${ICON_BUTTON_CLASS} hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400`}
+      disabled={isPending}
+      onClick={handleDelete}
+    >
+      <Trash2 className="h-4 w-4" />
     </button>
   );
 }

@@ -71,15 +71,17 @@ interface FormPanelProps {
   label: string;
   /** Recibe `close` para cerrar el formulario al terminar de guardar. */
   children: (close: () => void) => ReactNode;
+  /** Oculta el boton propio cuando la pagina ofrece otro punto de apertura (p. ej. la cabecera). */
+  showButton?: boolean;
 }
 
 /** Formulario de alta oculto hasta que se pulsa el boton; tambien se abre con la ancla (#id) o con requestOpenFormPanel. */
-export function FormPanel({ anchorId, label, children }: FormPanelProps) {
+export function FormPanel({ anchorId, label, children, showButton = true }: FormPanelProps) {
   const { isOpen, close, toggle } = useFormPanel(anchorId);
 
   return (
     <div id={anchorId} className="scroll-mt-36 space-y-3 md:scroll-mt-6">
-      <FormPanelButton isOpen={isOpen} label={label} onToggle={toggle} />
+      {showButton && <FormPanelButton isOpen={isOpen} label={label} onToggle={toggle} />}
 
       {isOpen && children(close)}
     </div>

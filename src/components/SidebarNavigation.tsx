@@ -38,15 +38,15 @@ interface SidebarNavigationProps {
 const LINK_STYLES = {
   sidebar: {
     base: 'gap-3 py-2',
-    active: 'bg-gradient-to-r from-brand-600 to-pink-500 text-white shadow-sm',
-    inactive: 'text-slate-600 hover:bg-pink-100/70 hover:text-pink-700',
-    inactiveIcon: 'text-brand-500',
+    active: 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white',
+    inactive: 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-white',
+    inactiveIcon: 'text-zinc-400 dark:text-zinc-500',
   },
   menu: {
     base: 'gap-3 py-3',
-    active: 'bg-white/95 text-blue-900',
-    inactive: 'text-white hover:bg-white/15',
-    inactiveIcon: 'text-white/80',
+    active: 'bg-zinc-800 text-white',
+    inactive: 'text-zinc-300 hover:bg-zinc-800/60 hover:text-white',
+    inactiveIcon: 'text-zinc-500',
   },
 };
 

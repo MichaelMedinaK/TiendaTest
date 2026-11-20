@@ -157,10 +157,13 @@ async function repriceOpenOrders(
   previousPrice: number,
   newPrice: number,
 ): Promise<number> {
+  // Quien fijo su propio precio de venta no cambia con el catalogo.
   const itemsToReprice = {
     productId,
     unitPrice: previousPrice,
-    order: OPEN_ORDER_FILTER,
+    order: {
+      AND: [OPEN_ORDER_FILTER, { seller: { inventoryItems: { some: { productId, salePrice: null } } } }],
+    },
   } satisfies Prisma.OrderItemWhereInput;
 
   const affectedItems = await transaction.orderItem.findMany({ where: itemsToReprice, select: { orderId: true } });
@@ -175,13 +178,16 @@ async function repriceOpenOrders(
   for (const orderId of orderIds) {
     const [items, order] = await Promise.all([
       transaction.orderItem.findMany({ where: { orderId }, select: { quantity: true, unitPrice: true } }),
-      transaction.order.findUniqueOrThrow({ where: { id: orderId }, select: { shippingPrice: true } }),
+      transaction.order.findUniqueOrThrow({
+        where: { id: orderId },
+        select: { shippingPrice: true, extraAmount: true },
+      }),
     ]);
     const itemsTotal = items.reduce((accumulated, item) => accumulated + item.unitPrice * item.quantity, 0);
 
     await transaction.order.update({
       where: { id: orderId },
-      data: { total: Math.round((itemsTotal + order.shippingPrice) * 100) / 100 },
+      data: { total: Math.round((itemsTotal + order.shippingPrice + order.extraAmount) * 100) / 100 },
     });
     await refreshPaymentStatus(transaction, orderId);
   }

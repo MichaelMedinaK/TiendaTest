@@ -44,6 +44,8 @@ enum MovementType {
   EXIT
   SALE
   SALE_RETURN
+  TRANSFER_OUT
+  TRANSFER_IN
 }
 
 model User {
@@ -55,8 +57,12 @@ model User {
   isActive           Boolean             @default(true)
   // Perfil adicional de domiciliario para tenderos y revendedores (el rol COURIER ya lo es por definicion).
   isCourier          Boolean             @default(false)
+  // Tendero (o administrador) que abastece a un revendedor: fija sus costos y le transfiere stock.
+  supplierId         String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  supplier           User?               @relation("Supply", fields: [supplierId], references: [id])
+  resellers          User[]              @relation("Supply")
   inventoryItems     InventoryItem[]
   inventoryMovements InventoryMovement[]
   orders             Order[]
@@ -65,11 +71,13 @@ model User {
   chatSent           ChatMessage[]       @relation("ChatSent")
   chatReceived       ChatMessage[]       @relation("ChatReceived")
 
+  @@index([supplierId])
   @@map("users")
 }
 
 // Catalogo general de productos: lo administra el ADMIN y es comun a todos los vendedores.
-// El precio real (costo) y el precio de venta tambien los define solo el ADMIN y valen para todos los inventarios.
+// El precio real (costo) y el precio de venta del catalogo son los de referencia; cada inventario puede
+// tener los suyos (ver InventoryItem).
 model Product {
   id             String          @id @default(uuid())
   name           String
@@ -85,11 +93,15 @@ model Product {
 }
 
 // Inventario de un usuario: su stock de cada producto del catalogo. Puede quedar negativo si se vende sin stock.
+// costPrice: lo que le cuesta el producto al dueno; solo aplica a revendedores, lo fija su tendero (vacio = el del catalogo).
+// salePrice: el precio al que vende el dueno (vacio = el precio de venta del catalogo).
 model InventoryItem {
   id        String              @id @default(uuid())
   ownerId   String
   productId String
   stock     Int                 @default(0)
+  costPrice Float?
+  salePrice Float?
   createdAt DateTime            @default(now())
   owner     User                @relation(fields: [ownerId], references: [id])
   product   Product             @relation(fields: [productId], references: [id])
@@ -112,11 +124,14 @@ model InventoryMovement {
   userId          String
   // Venta que origino el movimiento (sin relacion para conservar el historial si la venta se elimina).
   orderId         String?
+  // Une la salida y la entrada de una misma transferencia entre inventarios.
+  transferId      String?
   createdAt       DateTime      @default(now())
   inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
   user            User          @relation(fields: [userId], references: [id])
 
   @@index([inventoryItemId, createdAt])
+  @@index([transferId])
   @@map("inventory_movements")
 }
 
@@ -131,6 +146,8 @@ model Order {
   scheduledTo    String?
   distanceKm     Float?
   shippingPrice  Float          @default(0)
+  // Monto a cobrar aparte de productos y envio (p. ej. un tramite de cobro que hace el domiciliario).
+  extraAmount    Float          @default(0)
   paymentMethod  PaymentMethod  @default(CASH)
   // Se calcula con los cobros no anulados: Pendiente (nada), Parcial (menos que el total) o Pagado.
   paymentStatus  PaymentStatus  @default(PENDING)

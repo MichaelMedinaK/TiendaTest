@@ -1,6 +1,6 @@
 'use server';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, type MovementType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 import { executeAction } from '@/lib/action-runner';
@@ -12,6 +12,7 @@ import {
   ProductNotFoundError,
 } from '@/lib/errors';
 import { applyStockChange } from '@/lib/inventory-movements';
+import { effectiveCostPrice, effectiveSalePrice } from '@/lib/inventory-prices';
 import { assertOwnsInventory, resolveActingOwnerId, resolveOwnerFilter } from '@/lib/inventory-scope';
 import { INVENTORY_ROLES } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
@@ -23,7 +24,10 @@ const SALES_ROUTE = '/admin/ventas';
 // El nombre del producto aparece tambien en el inicio, las entregas y el reporte.
 const INVENTORY_VIEWS = [INVENTORY_ROUTE, SALES_ROUTE, '/admin/dashboard', '/admin/entregas', '/admin/reporte'];
 
-/** Producto del catalogo tal como esta en un inventario: `id` es el del catalogo (el que se vende). Precios: los del catalogo. */
+/**
+ * Producto del catalogo tal como esta en un inventario: `id` es el del catalogo (el que se vende).
+ * Los precios son los efectivos del dueno: `costPrice` lo que le cuesta y `price` a lo que vende.
+ */
 export interface InventoryProduct {
   id: string;
   inventoryItemId: string;
@@ -32,6 +36,8 @@ export interface InventoryProduct {
   sku: string | null;
   costPrice: number;
   price: number;
+  /** Precio de venta propio; null si usa el del catalogo. */
+  customSalePrice: number | null;
   /** Puede ser negativo: unidades vendidas sin stock que faltan por reponer. */
   stock: number;
 }
@@ -65,7 +71,7 @@ export interface MovementInput {
 
 export interface MovementView {
   id: string;
-  type: 'ENTRY' | 'EXIT' | 'SALE' | 'SALE_RETURN';
+  type: MovementType;
   quantity: number;
   stockAfter: number;
   reason: string;
@@ -81,6 +87,7 @@ export interface ManualMovementView extends MovementView {
 
 const ITEM_WITH_PRODUCT = {
   product: { select: { id: true, name: true, sku: true, costPrice: true, price: true } },
+  owner: { select: { role: true } },
 } satisfies Prisma.InventoryItemInclude;
 type ItemWithProduct = Prisma.InventoryItemGetPayload<{ include: typeof ITEM_WITH_PRODUCT }>;
 
@@ -91,8 +98,9 @@ function toInventoryProduct(item: ItemWithProduct): InventoryProduct {
     ownerId: item.ownerId,
     name: item.product.name,
     sku: item.product.sku,
-    costPrice: item.product.costPrice,
-    price: item.product.price,
+    costPrice: effectiveCostPrice(item, item.product, item.owner.role),
+    price: effectiveSalePrice(item, item.product),
+    customSalePrice: item.salePrice,
     stock: item.stock,
   };
 }
@@ -285,8 +293,8 @@ export async function getMovements(inventoryItemId: string): Promise<ActionResul
 }
 
 /**
- * Ultimas entradas y salidas manuales de un inventario (las que no vienen de una venta), de la mas reciente a la
- * mas antigua. Sin parametro: el propio; el administrador puede pedir el de otro usuario o `ALL`.
+ * Ultimas entradas, salidas y transferencias manuales de un inventario (las que no vienen de una venta), de la mas
+ * reciente a la mas antigua. Sin parametro: el propio; el administrador puede pedir el de otro usuario o `ALL`.
  */
 export async function getManualMovements(owner?: string): Promise<ActionResult<ManualMovementView[]>> {
   return executeAction('products.getManualMovements', async (trace) => {
@@ -294,7 +302,7 @@ export async function getManualMovements(owner?: string): Promise<ActionResult<M
 
     const movements = await prisma.inventoryMovement.findMany({
       where: {
-        type: { in: ['ENTRY', 'EXIT'] },
+        type: { in: ['ENTRY', 'EXIT', 'TRANSFER_OUT', 'TRANSFER_IN'] },
         orderId: null,
         inventoryItem: resolveOwnerFilter(session, owner, false),
       },

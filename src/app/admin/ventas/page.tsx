@@ -7,6 +7,7 @@ import { LOGIN_ROUTE } from '@/lib/constants';
 import { getCurrentSession } from '@/lib/session';
 import { readShippingRate } from '@/lib/shipping-rate';
 
+import { NewSaleButton } from './NewSaleButton';
 import { NewSalePanel } from './NewSalePanel';
 import { OrdersTable } from './OrdersTable';
 
@@ -35,9 +36,12 @@ export default async function SalesPage() {
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900">Ventas</h1>
-        <p className="text-sm text-slate-500">Registra, edita y elimina ventas del stock disponible</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Ventas</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Registra, edita y elimina ventas del stock disponible</p>
+        </div>
+        <NewSaleButton />
       </header>
 
       <NewSalePanel
@@ -48,7 +52,7 @@ export default async function SalesPage() {
       />
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-900">Historial de ventas</h2>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Historial de ventas</h2>
         <OrdersTable
           orders={ordersResult.data}
           products={productsResult.data}
