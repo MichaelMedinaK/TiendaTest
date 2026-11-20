@@ -16,7 +16,7 @@ import { StatusSelect } from '@/components/StatusSelect';
 import { BADGE_CLASS, CARD_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui/styles';
 import { NEW_SALE_ANCHOR } from '@/lib/constants';
 import { formatCurrency, formatExtraAmount, formatSchedule, formatScheduleDay, formatShipping, formatUserLabel } from '@/lib/format';
-import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
+import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, ORDER_KIND_LABELS, toSelectOptions } from '@/lib/labels';
 import type { ShippingRate } from '@/lib/shipping';
 
 import { OrderForm } from '../ventas/OrderForm';
@@ -114,7 +114,7 @@ export function SalesBoard({
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className={`${BADGE_CLASS} bg-pink-100 uppercase tracking-wide text-pink-700`}>
-                    {DELIVERY_METHOD_LABELS[order.deliveryMethod]}
+                    {order.kind === 'ERRAND' ? ORDER_KIND_LABELS.ERRAND : DELIVERY_METHOD_LABELS[order.deliveryMethod]}
                   </span>
                   {formatShipping(order) && <span className="text-xs text-slate-500">{formatShipping(order)}</span>}
                   {formatExtraAmount(order) && (

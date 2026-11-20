@@ -21,7 +21,12 @@ import {
   formatShipping,
   formatUserLabel,
 } from '@/lib/format';
-import { DELIVERY_METHOD_LABELS, DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
+import {
+  DELIVERY_METHOD_LABELS,
+  DELIVERY_STATUS_LABELS,
+  ORDER_KIND_LABELS,
+  toSelectOptions,
+} from '@/lib/labels';
 import { getBalance, getPaidAmount } from '@/lib/payments-view';
 import type { ShippingRate } from '@/lib/shipping';
 
@@ -239,7 +244,9 @@ export function OrdersTable({
                       </p>
                     )}
                     <p className={`mt-0.5 text-xs ${MUTED_TEXT}`}>
-                      {[DELIVERY_METHOD_LABELS[order.deliveryMethod], shipping].filter(Boolean).join(' · ')}
+                      {[order.kind === 'ERRAND' ? ORDER_KIND_LABELS.ERRAND : DELIVERY_METHOD_LABELS[order.deliveryMethod], shipping]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                     {formatExtraAmount(order) && (
                       <p className="mt-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-400">

@@ -39,6 +39,12 @@ enum DeliveryMethod {
   PICKUP
 }
 
+// SALE: venta de productos. ERRAND: tramite de cobro (solo direccion y monto; no lleva productos ni mueve stock).
+enum OrderKind {
+  SALE
+  ERRAND
+}
+
 enum MovementType {
   ENTRY
   EXIT
@@ -139,6 +145,7 @@ model Order {
   id             String         @id @default(uuid())
   sellerId       String
   reference      String
+  kind           OrderKind      @default(SALE)
   deliveryMethod DeliveryMethod @default(PICKUP)
   address        String?
   scheduledDate  DateTime?      @db.Date
@@ -146,7 +153,7 @@ model Order {
   scheduledTo    String?
   distanceKm     Float?
   shippingPrice  Float          @default(0)
-  // Monto a cobrar aparte de productos y envio (p. ej. un tramite de cobro que hace el domiciliario).
+  // Monto a cobrar de un tramite (tipo ERRAND); en una venta de productos es 0.
   extraAmount    Float          @default(0)
   paymentMethod  PaymentMethod  @default(CASH)
   // Se calcula con los cobros no anulados: Pendiente (nada), Parcial (menos que el total) o Pagado.

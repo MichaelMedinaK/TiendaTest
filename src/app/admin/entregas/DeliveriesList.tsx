@@ -11,7 +11,7 @@ import { PaymentsControl } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
 import { CARD_CLASS } from '@/components/ui/styles';
 import { formatDateTime, formatExtraAmount, formatSchedule, formatShipping } from '@/lib/format';
-import { DELIVERY_STATUS_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
+import { DELIVERY_STATUS_LABELS, ORDER_KIND_LABELS, PAYMENT_METHOD_LABELS, toSelectOptions } from '@/lib/labels';
 
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 const PAYMENT_METHOD_OPTIONS = toSelectOptions(PAYMENT_METHOD_LABELS);
@@ -36,7 +36,14 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
         <article key={order.id} className={`${CARD_CLASS} space-y-3`}>
           <header className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-slate-900">{order.reference}</h2>
+              <h2 className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                {order.reference}
+                {order.kind === 'ERRAND' && (
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                    {ORDER_KIND_LABELS.ERRAND}
+                  </span>
+                )}
+              </h2>
               <p className="text-xs text-slate-500">{formatDateTime(order.createdAt)}</p>
             </div>
           </header>

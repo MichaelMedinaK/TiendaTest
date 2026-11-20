@@ -4,7 +4,7 @@ import { Plus, Route, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useRef, useState, useTransition } from 'react';
 
-import type { DeliveryMethod, DeliveryStatus, PaymentMethod } from '@prisma/client';
+import type { DeliveryMethod, DeliveryStatus, OrderKind, PaymentMethod } from '@prisma/client';
 
 import { quoteDelivery } from '@/actions/delivery-quote';
 import { type OrderWithItems, createOrder, updateOrder } from '@/actions/orders';
@@ -23,6 +23,7 @@ import { formatCurrency, formatProductLabel, formatUserLabel, getStoreDayKey } f
 import {
   DELIVERY_METHOD_LABELS,
   DELIVERY_STATUS_LABELS,
+  ORDER_KIND_LABELS,
   PAYMENT_METHOD_LABELS,
   toSelectOptions,
 } from '@/lib/labels';
@@ -118,12 +119,15 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
   const [scheduledDate, setScheduledDate] = useState(order?.scheduledDate?.toISOString().slice(0, 10) ?? '');
   const [scheduledFrom, setScheduledFrom] = useState(order?.scheduledFrom ?? '');
   const [scheduledTo, setScheduledTo] = useState(order?.scheduledTo ?? '');
+  const [kind, setKind] = useState<OrderKind>(order?.kind ?? 'SALE');
   const [extraAmount, setExtraAmount] = useState<string>(order?.extraAmount ? String(order.extraAmount) : '');
   const [isPaid, setIsPaid] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isQuoting, startQuoting] = useTransition();
   const addressRef = useRef<HTMLInputElement>(null);
-  const isDelivery = deliveryMethod === 'DELIVERY';
+  // Un tramite siempre es a domicilio y no lleva productos: solo direccion y monto a cobrar.
+  const isErrand = kind === 'ERRAND';
+  const isDelivery = isErrand || deliveryMethod === 'DELIVERY';
 
   const productsById = useMemo(() => new Map(sellerProducts.map((product) => [product.id, product])), [sellerProducts]);
 
@@ -146,7 +150,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
   const itemsTotal = lines.reduce((accumulated, line) => accumulated + (Number(line.unitPrice) || 0) * line.quantity, 0);
   // Mismo calculo que el servidor (km x tarifa); el servidor es quien fija el valor definitivo.
   const shippingAmount = isDelivery ? calculateShippingPrice(Number(distanceKm) || 0, shippingRate) : 0;
-  const estimatedTotal = itemsTotal + shippingAmount + (Number(extraAmount) || 0);
+  const estimatedTotal = (isErrand ? Number(extraAmount) || 0 : itemsTotal) + shippingAmount;
 
   const updateLine = (index: number, changes: Partial<OrderLine>) => {
     setLines((currentLines) =>
@@ -193,26 +197,29 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
     const input = {
       reference: String(formData.get('reference') ?? ''),
       sellerId: isEditing ? undefined : sellerId,
-      deliveryMethod,
+      kind,
+      deliveryMethod: isErrand ? ('DELIVERY' as const) : deliveryMethod,
       address: String(formData.get('address') ?? ''),
       scheduledDate: String(formData.get('scheduledDate') ?? ''),
       scheduledFrom: String(formData.get('scheduledFrom') ?? ''),
       scheduledTo: String(formData.get('scheduledTo') ?? ''),
       distanceKm,
-      extraAmount,
+      extraAmount: isErrand ? extraAmount : '',
       paymentMethod: formData.get('paymentMethod') as PaymentMethod,
       // Al crear solo se indica si ya se cobro todo (se registra el cobro por el total); los cobros parciales se
       // registran despues desde Cobros. El envio siempre parte como nuevo.
       isPaid: isEditing ? undefined : isPaid,
       deliveryStatus: isEditing ? (formData.get('deliveryStatus') as DeliveryStatus) : 'PENDING',
-      items: lines
-        .filter((line) => line.productId)
-        // Sin precio manual no se envia ninguno: el servidor cobra el del catalogo.
-        .map(({ productId, quantity, unitPrice, hasCustomPrice }) => ({
-          productId,
-          quantity,
-          unitPrice: hasCustomPrice ? unitPrice : undefined,
-        })),
+      items: isErrand
+        ? []
+        : lines
+            .filter((line) => line.productId)
+            // Sin precio manual no se envia ninguno: el servidor cobra el del catalogo.
+            .map(({ productId, quantity, unitPrice, hasCustomPrice }) => ({
+              productId,
+              quantity,
+              unitPrice: hasCustomPrice ? unitPrice : undefined,
+            })),
     };
 
     startTransition(async () => {
@@ -225,6 +232,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
 
       if (!order) {
         form.reset();
+        setKind('SALE');
         setDeliveryMethod(DEFAULT_DELIVERY_METHOD);
         setDistanceKm('');
         setExtraAmount('');
@@ -233,9 +241,9 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         setScheduledTo('');
         setIsPaid(false);
         setLines([createEmptyLine(sellerProducts)]);
-        toast.success(`Venta registrada por ${formatCurrency(result.data.total)}`);
+        toast.success(`${isErrand ? 'Tramite' : 'Venta'} registrado por ${formatCurrency(result.data.total)}`);
       } else {
-        toast.success('Venta actualizada');
+        toast.success(`${isErrand ? 'Tramite' : 'Venta'} actualizado`);
       }
 
       router.refresh();
@@ -245,7 +253,30 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
 
   return (
     <form onSubmit={handleSubmit} className={`${CARD_CLASS} space-y-4`}>
-      <h2 className="text-lg font-semibold text-slate-900">{isEditing ? 'Editar venta' : 'Registrar nueva venta'}</h2>
+      <h2 className="text-lg font-semibold text-slate-900">
+        {isEditing ? 'Editar' : 'Registrar nuevo'} {isErrand ? 'tramite' : 'venta'}
+      </h2>
+
+      <div role="group" aria-label="Tipo de venta" className="inline-flex rounded-lg border border-slate-200 p-0.5">
+        {(['SALE', 'ERRAND'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={kind === option}
+            onClick={() => setKind(option)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+              kind === option ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {ORDER_KIND_LABELS[option]}
+          </button>
+        ))}
+      </div>
+      {isErrand && (
+        <p className="text-xs text-slate-500">
+          Tramite: alguien va a la direccion a cobrar un monto. No lleva productos ni mueve stock.
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {!isEditing && sellers.length > 1 && (
@@ -286,7 +317,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
           />
         </div>
 
-        <div>
+        <div className={isErrand ? 'hidden' : ''}>
           <label className={LABEL_CLASS} htmlFor="deliveryMethod">
             Tipo de entrega
           </label>
@@ -369,25 +400,26 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
           </p>
         </div>
 
+        {isErrand && (
         <div>
           <label className={LABEL_CLASS} htmlFor="extraAmount">
-            Monto a cobrar (aparte de productos y envio)
+            Monto a cobrar
           </label>
           <input
             id="extraAmount"
             type="number"
             inputMode="decimal"
-            min={0}
+            min={0.01}
             step="any"
+            required
             value={extraAmount}
             onChange={(event) => setExtraAmount(event.target.value)}
             className={INPUT_CLASS}
-            placeholder="Ej. 150 (opcional)"
+            placeholder="Ej. 150"
           />
-          <p className="mt-1 text-xs text-slate-500">
-            Para un tramite de cobro: el domiciliario va, cobra este monto y el envio. Se suma al total.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Se suma al envio para el total que se cobra.</p>
         </div>
+        )}
 
         <div>
           <label className={LABEL_CLASS} htmlFor="scheduledDate">
@@ -516,6 +548,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         )}
       </div>
 
+      {!isErrand && (
       <div className="space-y-3">
         <p className={LABEL_CLASS}>Productos del stock</p>
 
@@ -526,7 +559,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
         {lines.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 p-3 text-xs text-slate-500">
             Pedido sin productos: se registra igual y no mueve stock.
-            {isDelivery && ' Indica los kilometros para cobrar el delivery.'} Puedes indicar un monto a cobrar aparte.
+            {isDelivery && ' Indica los kilometros para cobrar el delivery.'} Para cobrar solo un monto, elige Tramite.
           </p>
         )}
 
@@ -654,6 +687,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
           Agregar producto
         </button>
       </div>
+      )}
 
       {feedback && <FeedbackMessage tone={feedback.tone} message={feedback.message} />}
 
@@ -668,7 +702,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
             </button>
           )}
           <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={isPending}>
-            {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Registrar venta'}
+            {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : isErrand ? 'Registrar tramite' : 'Registrar venta'}
           </button>
         </div>
       </div>

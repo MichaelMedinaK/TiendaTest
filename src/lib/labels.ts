@@ -1,7 +1,12 @@
 // Import de solo tipos: evita empaquetar el cliente Prisma en el bundle del navegador.
-import type { DeliveryMethod, DeliveryStatus, MovementType, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
+import type { DeliveryMethod, DeliveryStatus, MovementType, OrderKind, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 
 /** Etiquetas en espanol centralizadas para no duplicar textos en cada vista. */
+export const ORDER_KIND_LABELS: Record<OrderKind, string> = {
+  SALE: 'Venta',
+  ERRAND: 'Tramite',
+};
+
 export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
   DELIVERY: 'Envio a domicilio',
   PICKUP: 'Recogida en tienda',

@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { DeliveryMethod, DeliveryStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { DeliveryMethod, DeliveryStatus, OrderKind, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 import { executeAction } from '@/lib/action-runner';
@@ -27,6 +27,7 @@ import {
   optionalTime,
   requireEnumValue,
   requirePositiveInteger,
+  requirePositiveNumber,
   requireText,
 } from '@/lib/validation';
 
@@ -53,6 +54,8 @@ export interface OrderInput {
   reference: string;
   /** Solo el administrador: vende desde el inventario de ese usuario. Al editar se ignora (la venta conserva su vendedor). */
   sellerId?: string;
+  /** Venta de productos (por defecto) o tramite de cobro: solo direccion y monto, siempre a domicilio y sin productos. */
+  kind?: OrderKind;
   deliveryMethod: DeliveryMethod;
   address?: string;
   /** Fecha AAAA-MM-DD y horas HH:mm de la entrega o recogida. */
@@ -61,7 +64,7 @@ export interface OrderInput {
   scheduledTo?: string;
   /** Solo aplica al envio a domicilio. El precio del envio se calcula: kilometros x tarifa por km. */
   distanceKm?: string | number;
-  /** Monto a cobrar aparte de productos y envio (p. ej. un tramite de cobro); vacio o 0 si no hay. */
+  /** Monto a cobrar del tramite (obligatorio en un tramite; se ignora en una venta de productos). */
   extraAmount?: string | number;
   paymentMethod: PaymentMethod;
   /** Solo al registrar: si ya se cobro todo, se crea el cobro por el total con el metodo indicado. */
@@ -361,17 +364,23 @@ async function ensureOrderAccess(session: SessionPayload, orderId: string): Prom
 }
 
 function parseOrderInput(input: OrderInput) {
-  const deliveryMethod = requireEnumValue(input.deliveryMethod, DeliveryMethod, 'tipo de entrega');
+  const kind = input.kind === undefined ? OrderKind.SALE : requireEnumValue(input.kind, OrderKind, 'tipo de venta');
+  const isErrand = kind === OrderKind.ERRAND;
+  // Un tramite siempre es a domicilio: alguien va a la direccion a cobrar.
+  const deliveryMethod = isErrand ? DeliveryMethod.DELIVERY : requireEnumValue(input.deliveryMethod, DeliveryMethod, 'tipo de entrega');
   const isDelivery = deliveryMethod === DeliveryMethod.DELIVERY;
   const distanceKm = isDelivery ? optionalNonNegativeNumber(input.distanceKm, 'kilometros') : null;
 
   const shippingPrice = calculateShippingPrice(distanceKm ?? 0, readShippingRate());
-  // Un pedido puede ir sin productos (por ejemplo, solo delivery).
-  const items = mergeDuplicatedItems(input.items);
+  // Un tramite no lleva productos; una venta puede ir sin productos (por ejemplo, solo delivery).
+  const items = isErrand ? [] : mergeDuplicatedItems(input.items);
+  // El monto a cobrar es solo del tramite: al pasar a venta de productos se descarta.
+  const extraAmount = isErrand ? roundToCents(requirePositiveNumber(input.extraAmount, 'monto a cobrar')) : 0;
 
   return {
     fields: {
       reference: requireText(input.reference, 'referencia', 200),
+      kind,
       deliveryMethod,
       // La direccion solo aplica al envio; en recogida se descarta aunque llegue un valor.
       address: isDelivery ? requireText(input.address, 'direccion', 500) : null,
@@ -379,7 +388,7 @@ function parseOrderInput(input: OrderInput) {
       distanceKm,
       // El precio lo calcula el servidor (nunca el cliente): kilometros x tarifa, redondeado hacia arriba.
       shippingPrice,
-      extraAmount: roundToCents(optionalNonNegativeNumber(input.extraAmount, 'monto a cobrar') ?? 0),
+      extraAmount,
       paymentMethod: requireEnumValue(input.paymentMethod, PaymentMethod, 'metodo de pago'),
       deliveryStatus: requireEnumValue(input.deliveryStatus, DeliveryStatus, 'estado de envio'),
     },
