@@ -170,8 +170,8 @@ function ViewTab({ href, label, isActive }: { href: string; label: string; isAct
       href={href}
       className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
         isActive
-          ? 'bg-gradient-to-r from-brand-600 to-pink-500 text-white shadow-sm'
-          : 'bg-white text-slate-600 ring-1 ring-brand-200 hover:bg-pink-50 hover:text-pink-700 hover:ring-pink-300'
+          ? 'bg-indigo-600 text-white shadow-sm'
+          : 'bg-white text-slate-600 ring-1 ring-zinc-200 hover:bg-zinc-100 hover:text-slate-900 dark:ring-zinc-700 dark:hover:bg-zinc-800'
       }`}
     >
       {label}

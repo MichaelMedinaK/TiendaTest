@@ -4,6 +4,8 @@ import { getOrders } from '@/actions/orders';
 import { getInventoryOwners, getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
+import { formatCurrency } from '@/lib/format';
+import { getPaidByMethod } from '@/lib/payments-view';
 import { getCurrentSession } from '@/lib/session';
 import { readShippingRate } from '@/lib/shipping-rate';
 
@@ -33,6 +35,9 @@ export default async function SalesPage() {
   }
 
   const shippingRate = readShippingRate();
+  const cashReceived = getPaidByMethod(ordersResult.data.flatMap((order) => order.payments)).find(
+    ({ method }) => method === 'CASH',
+  )?.amount ?? 0;
 
   return (
     <section className="space-y-6">
@@ -43,6 +48,13 @@ export default async function SalesPage() {
         </div>
         <NewSaleButton />
       </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+        <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Efectivo recibido</span>
+        <span className="text-2xl font-semibold tracking-tight text-emerald-900 dark:text-emerald-200">
+          {formatCurrency(cashReceived)}
+        </span>
+      </div>
 
       <NewSalePanel
         products={productsResult.data}

@@ -396,14 +396,14 @@ function parseOrderInput(input: OrderInput) {
   };
 }
 
-/** Fecha y rango horario son opcionales, pero si se informan deben ser coherentes entre si. */
+/** La fecha es obligatoria; el rango horario es opcional, pero si se informa debe ser coherente. */
 function parseSchedule(input: OrderInput) {
   const scheduledDate = optionalIsoDate(input.scheduledDate, 'fecha de entrega');
   const scheduledFrom = optionalTime(input.scheduledFrom, 'hora desde');
   const scheduledTo = optionalTime(input.scheduledTo, 'hora hasta');
 
-  if ((scheduledFrom || scheduledTo) && !scheduledDate) {
-    throw new ValidationError('Indica la fecha de entrega para registrar el horario');
+  if (!scheduledDate) {
+    throw new ValidationError('Indica la fecha de entrega para registrar la venta');
   }
 
   if (Boolean(scheduledFrom) !== Boolean(scheduledTo)) {

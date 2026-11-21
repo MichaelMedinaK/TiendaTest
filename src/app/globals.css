@@ -65,28 +65,28 @@
   .dark {
     color-scheme: dark;
 
-    --brand-50: 23 37 84;
-    --brand-100: 30 58 138;
-    --brand-200: 30 64 175;
-    --brand-300: 37 99 235;
-    --brand-400: 96 165 250;
-    --brand-500: 96 165 250;
-    --brand-600: 37 99 235;
-    --brand-700: 29 78 216;
-    --brand-800: 147 197 253;
-    --brand-900: 191 219 254;
+    /* Paleta oscura neutra (zinc + un acento indigo): "brand" y "pink" ya no tiñen la interfaz de azul y rosa. */
+    --brand-50: 24 24 27;
+    --brand-100: 39 39 42;
+    --brand-200: 63 63 70;
+    --brand-300: 82 82 91;
+    --brand-400: 129 140 248;
+    --brand-500: 129 140 248;
+    --brand-600: 79 70 229;
+    --brand-700: 67 56 202;
+    --brand-800: 228 228 231;
+    --brand-900: 244 244 245;
 
-    /* 500 y 600 no cambian: son los extremos de los degradados con texto blanco. */
-    --pink-50: 46 12 32;
-    --pink-100: 74 16 50;
-    --pink-200: 112 20 72;
-    --pink-300: 157 23 77;
-    --pink-400: 244 114 182;
-    --pink-500: 236 72 153;
-    --pink-600: 219 39 119;
-    --pink-700: 249 168 212;
-    --pink-800: 251 207 232;
-    --pink-900: 252 231 243;
+    --pink-50: 24 24 27;
+    --pink-100: 39 39 42;
+    --pink-200: 63 63 70;
+    --pink-300: 82 82 91;
+    --pink-400: 129 140 248;
+    --pink-500: 99 102 241;
+    --pink-600: 79 70 229;
+    --pink-700: 165 180 252;
+    --pink-800: 199 210 254;
+    --pink-900: 224 231 255;
 
     --slate-50: 17 17 17;
     --slate-100: 26 26 26;
@@ -128,7 +128,7 @@
   /* Superficies (tarjetas, campos, botones secundarios, notificaciones). `text-white` se mantiene blanco.
      `:where` deja la especificidad baja para que un `dark:bg-*` explicito prevalezca. */
   :where(.dark) .bg-white {
-    background-color: #0b0b0b;
+    background-color: #18181b;
   }
 }
 

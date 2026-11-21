@@ -14,10 +14,10 @@ export const PRIMARY_BUTTON_CLASS =
 export const SECONDARY_BUTTON_CLASS =
   'inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-zinc-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800';
 
-export const TABLE_CLASS = 'min-w-full divide-y divide-slate-200 text-sm';
+export const TABLE_CLASS = 'min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800';
 
 export const TABLE_HEAD_CELL_CLASS =
-  'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-brand-800';
+  'px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
 
 export const TABLE_CELL_CLASS = 'px-4 py-3 align-middle text-slate-700';
 
@@ -27,29 +27,32 @@ export const BADGE_CLASS = 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-
  * Tabla responsive: en celulares cada elemento (`tbody`) es una tarjeta independiente, con borde, que
  * apila sus columnas con la etiqueta de cada una (atributo `data-label` de la celda). Desde `md` vuelve
  * a ser una tabla normal. La celda titulo (STACKED_TITLE_CELL_CLASS) hace de encabezado de la tarjeta.
+ * Las variantes `md:dark:` hacen falta porque la regla global del modo oscuro no alcanza a `md:bg-white`.
  */
 export const STACKED_WRAPPER_CLASS =
-  'overflow-x-auto md:rounded-xl md:border md:border-brand-100 md:bg-white md:shadow-md md:shadow-brand-200/40';
+  'overflow-x-auto md:rounded-xl md:border md:border-zinc-200 md:bg-white md:shadow-sm md:dark:border-zinc-800 md:dark:bg-zinc-900/50 md:dark:shadow-none';
 
-const STACKED_TABLE_BASE_CLASS = 'block w-full md:table md:min-w-full md:divide-y md:divide-slate-200';
+const STACKED_TABLE_BASE_CLASS =
+  'block w-full md:table md:min-w-full md:divide-y md:divide-zinc-200 md:dark:divide-zinc-800';
 
 export const STACKED_TABLE_CLASS = `${STACKED_TABLE_BASE_CLASS} text-sm`;
 
 /** Variante con la letra algo mas grande, para listas que se leen de un vistazo (historial de ventas). */
 export const STACKED_TABLE_LARGE_CLASS = `${STACKED_TABLE_BASE_CLASS} text-[0.9375rem]`;
 
-export const STACKED_HEAD_CLASS = 'hidden bg-gradient-to-r from-brand-50 to-pink-50 md:table-header-group';
+export const STACKED_HEAD_CLASS = 'hidden border-b border-zinc-200 md:table-header-group dark:border-zinc-800';
 
 export const STACKED_GROUP_CLASS =
-  'mb-3 block overflow-hidden rounded-xl border border-brand-100 bg-white shadow-md shadow-brand-200/40 transition md:mb-0 md:table-row-group md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:shadow-none';
+  'mb-3 block overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition dark:border-zinc-800 dark:bg-zinc-900/50 dark:shadow-none md:mb-0 md:table-row-group md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:shadow-none md:dark:bg-transparent';
 
 /** Resalta el elemento que se esta editando para saber en cual se esta parado. */
-export const STACKED_GROUP_ACTIVE_CLASS = 'border-pink-400 ring-2 ring-pink-400/40 md:ring-0 md:bg-pink-50';
+export const STACKED_GROUP_ACTIVE_CLASS =
+  'border-indigo-500 ring-2 ring-indigo-500/30 md:ring-0 md:!bg-indigo-50 md:dark:!bg-indigo-500/10';
 
-export const STACKED_ROW_CLASS = 'block py-2 md:table-row md:py-0 md:hover:bg-pink-50/60';
+export const STACKED_ROW_CLASS = 'block py-2 md:table-row md:py-0 md:hover:bg-zinc-50 md:dark:hover:bg-zinc-800/30';
 
 const STACKED_TITLE_CELL_BASE_CLASS =
-  '-mt-2 mb-1 block border-b border-brand-100 bg-gradient-to-r from-brand-50 to-pink-50 px-4 py-3 text-base font-semibold text-slate-900 md:mb-0 md:mt-0 md:table-cell md:border-b-0 md:bg-none md:py-3 md:font-medium';
+  '-mt-2 mb-1 block border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-base font-semibold text-slate-900 dark:border-zinc-800 dark:bg-zinc-800/50 md:mb-0 md:mt-0 md:table-cell md:border-b-0 md:bg-transparent md:dark:bg-transparent md:py-3 md:font-medium';
 
 export const STACKED_TITLE_CELL_CLASS = `${STACKED_TITLE_CELL_BASE_CLASS} md:text-sm`;
 
@@ -57,7 +60,8 @@ export const STACKED_TITLE_CELL_CLASS = `${STACKED_TITLE_CELL_BASE_CLASS} md:tex
 export const STACKED_TITLE_CELL_LARGE_CLASS = `${STACKED_TITLE_CELL_BASE_CLASS} md:text-[0.9375rem]`;
 
 /** Fila extra (formulario de edicion) pegada a la tarjeta del elemento. */
-export const STACKED_EDIT_ROW_CLASS = 'block border-t border-slate-200 bg-slate-50 md:table-row';
+export const STACKED_EDIT_ROW_CLASS =
+  'block border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60 md:table-row';
 
 export const STACKED_EDIT_CELL_CLASS = 'block p-4 md:table-cell';
 

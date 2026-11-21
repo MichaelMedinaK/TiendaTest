@@ -12,7 +12,7 @@ const VARIANT_STYLES: Record<ThemeToggleVariant, string> = {
   sidebar: `${SECONDARY_BUTTON_CLASS} w-full`,
   'on-dark': 'rounded-lg p-2 text-white transition hover:bg-zinc-800',
   floating:
-    'rounded-full border border-brand-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:border-pink-300 hover:bg-pink-50',
+    'rounded-full border border-zinc-300 bg-white p-2.5 text-slate-700 shadow-sm transition hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800',
 };
 
 /**

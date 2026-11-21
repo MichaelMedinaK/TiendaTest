@@ -48,12 +48,9 @@ export function DeliveriesList({ deliveries }: { deliveries: OrderWithItems[] })
             </div>
           </header>
 
-          <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
+          <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} amount={formatExtraAmount(order)} />
 
           {formatShipping(order) && <p className="text-sm font-medium text-brand-800">{formatShipping(order)}</p>}
-          {formatExtraAmount(order) && (
-            <p className="text-sm font-semibold text-brand-800">{formatExtraAmount(order)}</p>
-          )}
 
           <OrderItemsList items={order.items} className="text-sm" />
 

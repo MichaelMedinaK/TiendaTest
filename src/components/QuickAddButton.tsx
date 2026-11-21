@@ -44,9 +44,9 @@ export function QuickAddButton() {
       onClick={handleClick}
       aria-label={action.label}
       title={action.label}
-      className="fixed bottom-6 right-6 z-40 inline-flex h-12 w-12 items-center justify-center gap-2 rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-lg shadow-black/30 transition hover:bg-indigo-500 md:w-auto md:px-5 print:hidden"
+      className="fixed bottom-5 right-5 z-40 inline-flex h-10 w-10 items-center justify-center gap-1.5 rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-lg shadow-black/30 transition hover:bg-indigo-500 md:h-auto md:w-auto md:px-3.5 md:py-2 print:hidden"
     >
-      <Plus className="h-5 w-5" />
+      <Plus className="h-4 w-4" />
       <span className="hidden md:inline">{action.label}</span>
     </Link>
   );

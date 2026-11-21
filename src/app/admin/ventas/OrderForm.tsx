@@ -62,6 +62,8 @@ const QUICK_DATES = [
   { label: 'Manana', offset: 1 },
 ];
 
+const SCHEDULE_TIMES = ['19:00', '19:30', '20:00', '20:30'];
+
 /** Duracion por defecto de la ventana de entrega: la hora "hasta" sale 30 minutos despues de la "desde". */
 const DEFAULT_SLOT_MINUTES = 30;
 const LAST_MINUTE_OF_DAY = 23 * 60 + 59;
@@ -162,17 +164,14 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
     setLines((currentLines) => currentLines.filter((_, lineIndex) => lineIndex !== index));
   };
 
+  // Al elegir la hora, la ventana de entrega dura DEFAULT_SLOT_MINUTES; sin hora, se limpia el rango.
   const handleScheduledFromChange = (nextFrom: string) => {
-    const suggestedTo = addMinutesToTime(nextFrom, DEFAULT_SLOT_MINUTES);
-    const previousSuggestedTo = addMinutesToTime(scheduledFrom, DEFAULT_SLOT_MINUTES);
-
-    // "Hasta" se ajusta mientras siga siendo el sugerido o ya no quede despues de "desde"; si se edito a mano, se respeta.
-    if (suggestedTo && (!scheduledTo || scheduledTo === previousSuggestedTo || scheduledTo <= nextFrom)) {
-      setScheduledTo(suggestedTo);
-    }
-
     setScheduledFrom(nextFrom);
+    setScheduledTo(addMinutesToTime(nextFrom, DEFAULT_SLOT_MINUTES) ?? '');
   };
+
+  // Al editar, una hora ya guardada que no este en la lista se conserva como opcion.
+  const timeOptions = scheduledFrom && !SCHEDULE_TIMES.includes(scheduledFrom) ? [...SCHEDULE_TIMES, scheduledFrom] : SCHEDULE_TIMES;
 
   const handleQuoteDistance = () => {
     startQuoting(async () => {
@@ -429,6 +428,7 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
             id="scheduledDate"
             name="scheduledDate"
             type="date"
+            required
             value={scheduledDate}
             onChange={(event) => setScheduledDate(event.target.value)}
             className={INPUT_CLASS}
@@ -445,8 +445,8 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
                   onClick={() => setScheduledDate(value)}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                     scheduledDate === value
-                      ? 'border-pink-400 bg-pink-50 text-pink-700'
-                      : 'border-brand-200 bg-white text-slate-700 hover:border-pink-300 hover:bg-pink-50'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                      : 'border-zinc-300 bg-white text-slate-700 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800'
                   }`}
                 >
                   {label}
@@ -456,33 +456,25 @@ export function OrderForm({ products, shippingRate, order, sellers = [], current
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL_CLASS} htmlFor="scheduledFrom">
-              Hora desde
-            </label>
-            <input
-              id="scheduledFrom"
-              name="scheduledFrom"
-              type="time"
-              value={scheduledFrom}
-              onChange={(event) => handleScheduledFromChange(event.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div>
-            <label className={LABEL_CLASS} htmlFor="scheduledTo">
-              Hora hasta
-            </label>
-            <input
-              id="scheduledTo"
-              name="scheduledTo"
-              type="time"
-              value={scheduledTo}
-              onChange={(event) => setScheduledTo(event.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
+        <div>
+          <label className={LABEL_CLASS} htmlFor="scheduledFrom">
+            Hora
+          </label>
+          <select
+            id="scheduledFrom"
+            name="scheduledFrom"
+            value={scheduledFrom}
+            onChange={(event) => handleScheduledFromChange(event.target.value)}
+            className={INPUT_CLASS}
+          >
+            <option value="">Sin hora</option>
+            {timeOptions.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
+          {scheduledTo && <p className="mt-1 text-xs text-slate-500">Ventana de {scheduledFrom} a {scheduledTo}</p>}
         </div>
 
         <div>

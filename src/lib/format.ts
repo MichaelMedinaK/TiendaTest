@@ -89,9 +89,9 @@ export function formatSchedule({ scheduledDate, scheduledFrom, scheduledTo }: Sc
   return scheduledFrom && scheduledTo ? `${day} ${scheduledFrom} - ${scheduledTo}` : day;
 }
 
-/** "Monto a cobrar S/ 50.00" cuando la venta lleva un cobro aparte de productos y envio, o null si no. */
-export function formatExtraAmount({ extraAmount }: { extraAmount: number }): string | null {
-  return extraAmount > 0 ? `Monto a cobrar ${formatCurrency(extraAmount)}` : null;
+/** "Monto a cobrar S/ 72.00" en un tramite: el total real (monto del tramite + envio), o null si no es un tramite. */
+export function formatExtraAmount({ extraAmount, total }: { extraAmount: number; total: number }): string | null {
+  return extraAmount > 0 ? `Monto a cobrar ${formatCurrency(total)}` : null;
 }
 
 /** Texto de km y precio de envio ("12.5 km - Envio S/ 5.00"), o null si no se registro ninguno. */

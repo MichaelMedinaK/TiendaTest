@@ -85,7 +85,7 @@ export function SalesBoard({
     <div className="space-y-6">
       {groupByScheduledDay(orders).map((group) => (
         <section key={group.key} className="space-y-3">
-          <h2 className="border-l-4 border-pink-500 pl-2 text-base font-bold uppercase tracking-wide text-pink-700">
+          <h2 className="border-l-4 border-indigo-500 pl-2 text-base font-semibold uppercase tracking-wide text-slate-700">
             {group.title}
           </h2>
 
@@ -105,21 +105,18 @@ export function SalesBoard({
                 <header className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold text-slate-900">{order.reference}</h3>
-                    {showSeller && <p className="text-xs text-pink-600">Vendedor: {formatUserLabel(order.seller)}</p>}
+                    {showSeller && <p className="text-xs text-slate-500">Vendedor: {formatUserLabel(order.seller)}</p>}
                   </div>
                   <p className="shrink-0 text-base font-bold text-brand-800">{formatCurrency(order.total)}</p>
                 </header>
 
-                <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} />
+                <DeliveryHighlight address={order.address} schedule={formatSchedule(order)} amount={formatExtraAmount(order)} />
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className={`${BADGE_CLASS} bg-pink-100 uppercase tracking-wide text-pink-700`}>
+                  <span className={`${BADGE_CLASS} bg-indigo-100 uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300`}>
                     {order.kind === 'ERRAND' ? ORDER_KIND_LABELS.ERRAND : DELIVERY_METHOD_LABELS[order.deliveryMethod]}
                   </span>
                   {formatShipping(order) && <span className="text-xs text-slate-500">{formatShipping(order)}</span>}
-                  {formatExtraAmount(order) && (
-                    <span className="text-xs font-semibold text-brand-800">{formatExtraAmount(order)}</span>
-                  )}
                 </div>
 
                 <OrderItemsList items={order.items} />

@@ -52,8 +52,8 @@ export function PdfDownload({ owner }: { owner?: string }) {
               }}
               className={`${CHIP_CLASS} ${
                 isActive
-                  ? 'border-pink-400 bg-pink-50 text-pink-700'
-                  : 'border-brand-200 bg-white text-slate-700 hover:border-pink-300 hover:bg-pink-50'
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                  : 'border-zinc-300 bg-white text-slate-700 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800'
               }`}
             >
               {preset.label}

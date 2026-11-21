@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
+import { Clock, Pencil, Search, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -18,7 +18,6 @@ import {
   formatExtraAmount,
   formatProductLabel,
   formatSchedule,
-  formatShipping,
   formatUserLabel,
 } from '@/lib/format';
 import {
@@ -76,15 +75,42 @@ const DELIVERY_SELECT_TONES: Record<DeliveryStatus, string> = {
 
 const MUTED_TEXT = 'text-zinc-500 dark:text-zinc-400';
 const STRONG_TEXT = 'text-zinc-900 dark:text-white';
-const HEAD_CELL_CLASS = 'px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
-const CELL_CLASS = 'px-4 py-3 align-top';
+// Planilla: bordes horizontales sutiles y divisiones verticales suaves entre columnas.
+const SHEET_ROW_DIVIDERS = 'divide-x divide-zinc-200/70 dark:divide-zinc-800/50';
+const SHEET_ROW_BORDER = 'border-zinc-200 dark:border-zinc-800/80';
+const HEAD_CELL_CLASS =
+  'px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400';
+const CELL_CLASS = 'px-3 py-2.5 align-top';
 const FILTER_CONTROL_CLASS =
   'h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100';
 const ICON_BUTTON_CLASS =
-  'inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400';
+  'inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400';
 
 const getDeliverySelectClassName = (status: DeliveryStatus) =>
-  `h-8 w-full min-w-[7.5rem] rounded-md border px-2 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-60 ${DELIVERY_SELECT_TONES[status]}`;
+  `h-7 w-full min-w-[7.5rem] rounded-md border px-2 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-60 ${DELIVERY_SELECT_TONES[status]}`;
+
+interface MetaPart {
+  key: string;
+  text: string;
+  className?: string;
+}
+
+/** Segunda linea de la venta: tipo de entrega, km, envio, monto a cobrar y vendedor, separados por "·". */
+function buildMetaParts(order: OrderWithItems, showSeller: boolean): MetaPart[] {
+  const extraAmount = formatExtraAmount(order);
+  const parts: (MetaPart | null)[] = [
+    {
+      key: 'kind',
+      text: order.kind === 'ERRAND' ? ORDER_KIND_LABELS.ERRAND : DELIVERY_METHOD_LABELS[order.deliveryMethod],
+    },
+    order.distanceKm !== null ? { key: 'km', text: `${order.distanceKm} km` } : null,
+    order.shippingPrice > 0 ? { key: 'shipping', text: `Envio ${formatCurrency(order.shippingPrice)}` } : null,
+    extraAmount ? { key: 'extra', text: extraAmount, className: 'font-medium text-indigo-600 dark:text-indigo-400' } : null,
+    showSeller ? { key: 'seller', text: formatUserLabel(order.seller), className: 'text-zinc-600 dark:text-zinc-300' } : null,
+  ];
+
+  return parts.filter((part): part is MetaPart => part !== null);
+}
 
 /** Minusculas y sin tildes para que "Peru" encuentre "Perú". */
 const normalizeText = (text: string) =>
@@ -188,16 +214,16 @@ export function OrdersTable({
             </select>
           </label>
 
-          <p className={`text-xs ${MUTED_TEXT}`}>
+          <p className={`text-xs tabular-nums ${MUTED_TEXT}`}>
             {visibleOrders.length} de {orders.length}
           </p>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
-        <table className="w-full min-w-[60rem] text-sm">
-          <thead className="border-b border-zinc-200 dark:border-zinc-800">
-            <tr>
+      <div className={`overflow-x-auto rounded-xl border bg-white dark:bg-zinc-900/40 ${SHEET_ROW_BORDER}`}>
+        <table className="w-full min-w-[60rem] border-collapse text-sm">
+          <thead className={`border-b bg-zinc-50 dark:bg-zinc-900/80 ${SHEET_ROW_BORDER}`}>
+            <tr className={SHEET_ROW_DIVIDERS}>
               <th className={HEAD_CELL_CLASS}>Venta / Destino</th>
               <th className={HEAD_CELL_CLASS}>Fecha</th>
               <th className={HEAD_CELL_CLASS}>Productos</th>
@@ -220,7 +246,7 @@ export function OrdersTable({
 
           {visibleOrders.map((order) => {
             const schedule = formatSchedule(order);
-            const shipping = formatShipping(order);
+            const metaParts = buildMetaParts(order, showSeller);
             const [createdDay, createdTime] = formatDateTime(order.createdAt).split(' ');
             const paymentBadge = PAYMENT_BADGES[order.paymentStatus];
             const paidAmount = getPaidAmount(order.payments);
@@ -230,76 +256,68 @@ export function OrdersTable({
             return (
               <tbody
                 key={order.id}
-                className={`border-b border-zinc-200 last:border-b-0 dark:border-zinc-800 ${
+                className={`border-b last:border-b-0 ${SHEET_ROW_BORDER} ${
                   editingOrderId === order.id ? 'bg-indigo-500/5' : ''
                 }`}
               >
-                <tr className="transition hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                  <td className={`${CELL_CLASS} min-w-[16rem] max-w-sm`}>
-                    <p className={`text-sm font-medium ${STRONG_TEXT}`}>{order.reference}</p>
-                    {order.address && (
-                      <p className={`mt-0.5 flex items-start gap-1 text-xs ${MUTED_TEXT}`}>
-                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-                        <span>{order.address}</span>
-                      </p>
-                    )}
-                    <p className={`mt-0.5 text-xs ${MUTED_TEXT}`}>
-                      {[order.kind === 'ERRAND' ? ORDER_KIND_LABELS.ERRAND : DELIVERY_METHOD_LABELS[order.deliveryMethod], shipping]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                    {formatExtraAmount(order) && (
-                      <p className="mt-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-400">
-                        {formatExtraAmount(order)}
-                      </p>
-                    )}
-                    {showSeller && (
-                      <p className="mt-0.5 text-[11px] text-zinc-500">Vendedor: {formatUserLabel(order.seller)}</p>
-                    )}
-                    {schedule && (
-                      <span className="mt-2 inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                        <Clock className="h-3 w-3" />
-                        {schedule}
+                <tr className={`transition hover:bg-zinc-50 dark:hover:bg-zinc-800/30 ${SHEET_ROW_DIVIDERS}`}>
+                  <td className={`${CELL_CLASS} min-w-[18rem] max-w-md`}>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span
+                        className={`text-sm tabular-nums ${order.address ? `font-medium ${MUTED_TEXT}` : `font-medium ${STRONG_TEXT}`}`}
+                      >
+                        {order.reference}
                       </span>
-                    )}
+                      {order.address && (
+                        <span className={`text-sm font-medium ${STRONG_TEXT}`}>{order.address}</span>
+                      )}
+                      {schedule && (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded border border-zinc-200 bg-zinc-100 px-1.5 py-px text-[11px] font-medium tabular-nums text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-800/80 dark:text-zinc-200">
+                          <Clock className="h-3 w-3" />
+                          {schedule}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`mt-1 text-xs tabular-nums ${MUTED_TEXT}`}>
+                      {metaParts.map((part, index) => (
+                        <span key={part.key}>
+                          {index > 0 && <span className="px-1 text-zinc-400 dark:text-zinc-600">·</span>}
+                          <span className={part.className}>{part.text}</span>
+                        </span>
+                      ))}
+                    </p>
                   </td>
 
-                  <td className={`${CELL_CLASS} whitespace-nowrap`}>
+                  <td className={`${CELL_CLASS} whitespace-nowrap tabular-nums`}>
                     <p className={`text-xs font-medium ${STRONG_TEXT}`}>{createdDay}</p>
                     <p className={`text-xs ${MUTED_TEXT}`}>{createdTime}</p>
                   </td>
 
                   <td className={`${CELL_CLASS} min-w-[12rem]`}>
                     {order.items.length === 0 ? (
-                      <p className={`text-xs italic ${MUTED_TEXT}`}>Pedido sin productos</p>
+                      <p className="text-xs text-zinc-500">— Sin productos</p>
                     ) : (
-                      <ul className="space-y-1.5">
+                      <ul className="space-y-0.5">
                         {order.items.map((item) => (
-                          <li key={item.id}>
-                            <p className="text-[13px] text-zinc-700 dark:text-zinc-200">
-                              <span className={`font-semibold ${STRONG_TEXT}`}>{item.quantity}x</span>{' '}
-                              {formatProductLabel(item.product)}
-                            </p>
-                            <p className={`text-xs ${MUTED_TEXT}`}>{formatCurrency(item.unitPrice)} c/u</p>
+                          <li key={item.id} className="text-[13px] leading-5 text-zinc-700 dark:text-zinc-200">
+                            <span className={`font-semibold tabular-nums ${STRONG_TEXT}`}>{item.quantity}x</span>{' '}
+                            {formatProductLabel(item.product)}
+                            <span className={`ml-1.5 text-xs tabular-nums ${MUTED_TEXT}`}>
+                              {formatCurrency(item.unitPrice)} c/u
+                            </span>
                           </li>
                         ))}
                       </ul>
                     )}
                   </td>
 
-                  <td className={CELL_CLASS}>
-                    <div className="flex flex-col items-start gap-1">
+                  <td className={`${CELL_CLASS} whitespace-nowrap`}>
+                    <div className="flex items-center gap-2">
                       <span
-                        className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${paymentBadge.className}`}
+                        className={`inline-flex rounded-full border px-2 py-px text-[11px] font-medium ${paymentBadge.className}`}
                       >
                         {paymentBadge.label}
                       </span>
-                      <PaidByMethod order={order} className={`text-xs ${MUTED_TEXT}`} />
-                      {order.paymentStatus === 'PARTIAL' && (
-                        <p className={`text-xs ${MUTED_TEXT}`}>
-                          Cobrado {formatCurrency(paidAmount)} de {formatCurrency(order.total)}
-                        </p>
-                      )}
                       <button
                         type="button"
                         aria-expanded={isPaymentsOpen}
@@ -309,10 +327,16 @@ export function OrdersTable({
                         {canCollect ? '+ Cobrar' : 'Cobros'}
                       </button>
                     </div>
+                    <PaidByMethod order={order} className={`mt-1 text-xs tabular-nums ${MUTED_TEXT}`} />
+                    {order.paymentStatus === 'PARTIAL' && (
+                      <p className={`text-xs tabular-nums ${MUTED_TEXT}`}>
+                        Cobrado {formatCurrency(paidAmount)} de {formatCurrency(order.total)}
+                      </p>
+                    )}
                   </td>
 
                   <td className={`${CELL_CLASS} whitespace-nowrap text-right`}>
-                    <span className={`text-base font-semibold tabular-nums ${STRONG_TEXT}`}>
+                    <span className={`text-sm font-semibold tabular-nums ${STRONG_TEXT}`}>
                       {formatCurrency(order.total)}
                     </span>
                   </td>
@@ -328,7 +352,7 @@ export function OrdersTable({
                   </td>
 
                   <td className={CELL_CLASS}>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <button
                         type="button"
                         title="Editar venta"
@@ -345,7 +369,7 @@ export function OrdersTable({
                 </tr>
 
                 {isPaymentsOpen && (
-                  <tr className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <tr className={`border-t bg-zinc-50 dark:bg-zinc-900/60 ${SHEET_ROW_BORDER}`}>
                     <td colSpan={COLUMN_COUNT} className="p-4">
                       <PaymentsPanel order={order} />
                     </td>
@@ -353,7 +377,7 @@ export function OrdersTable({
                 )}
 
                 {editingOrderId === order.id && (
-                  <tr className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <tr className={`border-t bg-zinc-50 dark:bg-zinc-900/60 ${SHEET_ROW_BORDER}`}>
                     <td colSpan={COLUMN_COUNT} className="p-4">
                       <OrderForm
                         products={products}

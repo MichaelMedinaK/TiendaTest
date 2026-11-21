@@ -15,10 +15,10 @@ export default function LoginPage() {
 
       <div className={`${CARD_CLASS} w-full max-w-sm`}>
         <div className="mb-6 text-center">
-          <span className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-pink-500 text-white shadow-md">
+          <span className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md">
             <Store className="h-7 w-7" />
           </span>
-          <h1 className="bg-gradient-to-r from-brand-500 to-pink-500 bg-clip-text text-xl font-bold text-transparent">
+          <h1 className="text-xl font-semibold text-slate-900">
             Tienda Test
           </h1>
           <p className="text-sm text-slate-500">Ingresa con tu cuenta de administrador</p>
