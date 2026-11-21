@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Pencil, Search, Trash2 } from 'lucide-react';
+import { Clock, FileSpreadsheet, Pencil, Search, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -26,6 +26,7 @@ import {
   ORDER_KIND_LABELS,
   toSelectOptions,
 } from '@/lib/labels';
+import { downloadOrdersExcel } from '@/lib/orders-export';
 import { getBalance, getPaidAmount } from '@/lib/payments-view';
 import type { ShippingRate } from '@/lib/shipping';
 
@@ -217,6 +218,8 @@ export function OrdersTable({
           <p className={`text-xs tabular-nums ${MUTED_TEXT}`}>
             {visibleOrders.length} de {orders.length}
           </p>
+
+          <ExportOrdersButton orders={visibleOrders} includeSeller={showSeller} />
         </div>
       </div>
 
@@ -394,6 +397,37 @@ export function OrdersTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function ExportOrdersButton({ orders, includeSeller }: { orders: OrderWithItems[]; includeSeller: boolean }) {
+  const feedback = useFeedback();
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+
+    try {
+      await downloadOrdersExcel(orders, { includeSeller });
+    } catch (error) {
+      console.error('No se pudo generar el Excel de ventas', error);
+      feedback.error('No se pudo generar el Excel. Intenta de nuevo.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      title="Descarga las ventas filtradas en un archivo de Excel"
+      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      disabled={isExporting || orders.length === 0}
+      onClick={handleExport}
+    >
+      <FileSpreadsheet className="h-4 w-4" />
+      {isExporting ? 'Generando...' : 'Descargar Excel'}
+    </button>
   );
 }
 
