@@ -4,20 +4,16 @@ import { getOrders } from '@/actions/orders';
 import { getInventoryOwners, getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
-import { getStoreDayKey } from '@/lib/format';
-import { getPaidByMethod, roundToCents } from '@/lib/payments-view';
-import { filterOrdersByPeriod } from '@/lib/report-summary';
 import { getCurrentSession } from '@/lib/session';
 import { readShippingRate } from '@/lib/shipping-rate';
 
 import { NewSaleButton } from './NewSaleButton';
 import { NewSalePanel } from './NewSalePanel';
 import { OrdersTable } from './OrdersTable';
-import { PeriodSummary, SUMMARY_PERIODS, readSummaryPeriod } from './PeriodSummary';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SalesPage({ searchParams }: { searchParams?: Promise<{ periodo?: string }> }) {
+export default async function SalesPage() {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -37,15 +33,6 @@ export default async function SalesPage({ searchParams }: { searchParams?: Promi
   }
 
   const shippingRate = readShippingRate();
-  // Mismo criterio que el informe: el periodo se toma por la fecha de la venta.
-  const period = readSummaryPeriod((await searchParams)?.periodo);
-  const periodOrders = filterOrdersByPeriod(ordersResult.data, { from: SUMMARY_PERIODS[period].from(), to: getStoreDayKey() });
-  const cashReceived = getPaidByMethod(periodOrders.flatMap((order) => order.payments)).find(
-    ({ method }) => method === 'CASH',
-  )?.amount ?? 0;
-  // El domiciliario gana el envio completo; las ventas canceladas no suman.
-  const shippedOrders = periodOrders.filter((order) => order.deliveryStatus !== 'CANCELLED' && order.shippingPrice > 0);
-  const shippingTotal = roundToCents(shippedOrders.reduce((accumulated, order) => accumulated + order.shippingPrice, 0));
 
   return (
     <section className="space-y-6">
@@ -56,13 +43,6 @@ export default async function SalesPage({ searchParams }: { searchParams?: Promi
         </div>
         <NewSaleButton />
       </header>
-
-      <PeriodSummary
-        period={period}
-        cashReceived={cashReceived}
-        shippingTotal={shippingTotal}
-        shippingCount={shippedOrders.length}
-      />
 
       <NewSalePanel
         products={productsResult.data}

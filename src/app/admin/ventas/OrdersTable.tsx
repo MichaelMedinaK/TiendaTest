@@ -28,9 +28,11 @@ import {
 } from '@/lib/labels';
 import { downloadOrdersExcel } from '@/lib/orders-export';
 import { getBalance, getPaidAmount } from '@/lib/payments-view';
+import { DEFAULT_SUMMARY_PERIOD, type SummaryPeriod, buildPeriodSummary } from '@/lib/period-summary';
 import type { ShippingRate } from '@/lib/shipping';
 
 import { OrderForm } from './OrderForm';
+import { PeriodSummary } from './PeriodSummary';
 
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 const COLUMN_COUNT = 7;
@@ -149,6 +151,7 @@ export function OrdersTable({
   const [searchText, setSearchText] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>(ALL);
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>(ALL);
+  const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>(DEFAULT_SUMMARY_PERIOD);
 
   // Tras persistir un cambio se refresca el server component para recalcular stock y metricas.
   const refreshAfter = async <TResult,>(action: Promise<TResult>): Promise<TResult> => {
@@ -168,9 +171,17 @@ export function OrdersTable({
       (deliveryFilter === ALL || order.deliveryStatus === deliveryFilter) &&
       (normalizedSearch === '' || buildSearchText(order).includes(normalizedSearch)),
   );
+  const isFiltered = paymentFilter !== ALL || deliveryFilter !== ALL || normalizedSearch !== '';
 
   return (
     <div className="space-y-3">
+      <PeriodSummary
+        period={summaryPeriod}
+        onPeriodChange={setSummaryPeriod}
+        summary={buildPeriodSummary(visibleOrders, summaryPeriod)}
+        isFiltered={isFiltered}
+      />
+
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
