@@ -8,7 +8,7 @@ import { DASHBOARD_ROUTE, OPEN_DELIVERY_STATUSES } from '@/lib/constants';
 import { getStoreDayKey } from '@/lib/format';
 import { DELIVERY_STATUS_LABELS, toSelectOptions } from '@/lib/labels';
 import { getCurrentSession } from '@/lib/session';
-import { readShippingRate } from '@/lib/shipping-rate';
+import { getShippingRate } from '@/lib/shipping-rate';
 
 import { QuickAccess } from './QuickAccess';
 import { SalesBoard } from './SalesBoard';
@@ -85,10 +85,11 @@ export default async function DashboardPage({
   searchParams?: Promise<{ dia?: string; estado?: string }>;
 }) {
   const { dia, estado } = (await searchParams) ?? {};
-  const [ordersResult, productsResult, session] = await Promise.all([
+  const [ordersResult, productsResult, session, shippingRate] = await Promise.all([
     getOrders(),
     getProducts('ALL'),
     getCurrentSession(),
+    getShippingRate(),
   ]);
 
   if (!ordersResult.success) {
@@ -157,7 +158,7 @@ export default async function DashboardPage({
       <SalesBoard
         orders={orders}
         products={productsResult.data}
-        shippingRate={readShippingRate()}
+        shippingRate={shippingRate}
         showSeller={session?.role === 'ADMIN'}
       />
     </section>

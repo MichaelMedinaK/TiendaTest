@@ -6,7 +6,7 @@ import { ServiceUnavailableError, ValidationError } from '@/lib/errors';
 import { INVENTORY_ROLES } from '@/lib/permissions';
 import { requireRole } from '@/lib/session';
 import { calculateShippingPrice } from '@/lib/shipping';
-import { readShippingRate } from '@/lib/shipping-rate';
+import { getShippingRate } from '@/lib/shipping-rate';
 import { requireText } from '@/lib/validation';
 
 // Nominatim (geocodificacion) y OSRM (rutas) son servicios publicos de OpenStreetMap sin clave de API.
@@ -47,7 +47,7 @@ export async function quoteDelivery(address: string): Promise<ActionResult<Deliv
     const distanceKm = await drivingDistanceKm(origin, destination.coordinates);
     trace.addStep(`distancia-calculada:${distanceKm}km`);
 
-    const shippingRate = readShippingRate();
+    const shippingRate = await getShippingRate();
 
     return {
       distanceKm,

@@ -1,6 +1,6 @@
 'use server';
 
-import { Prisma, type MovementType } from '@prisma/client';
+import { Prisma, type MovementType, type Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 import { executeAction } from '@/lib/action-runner';
@@ -46,6 +46,7 @@ export interface InventoryOwner {
   id: string;
   name: string | null;
   email: string;
+  role: Role;
 }
 
 export interface CatalogOption {
@@ -141,7 +142,7 @@ export async function getInventoryOwners(): Promise<ActionResult<InventoryOwner[
           ? { isActive: true, role: { in: INVENTORY_ROLES } }
           : { id: session.userId },
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, role: true },
     });
   });
 }

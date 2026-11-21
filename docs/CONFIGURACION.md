@@ -95,12 +95,14 @@ Ejemplos de zona horaria: `America/Lima`, `America/Bogota`, `America/Mexico_City
 
 ### Cotización del delivery
 
-El precio se calcula como kilómetros × `DELIVERY_RATE_PER_KM`, redondeado hacia arriba a la unidad (4.7 km × 1.7 = 7.99 → 8) y nunca por debajo de `DELIVERY_MIN_PRICE`. En una recogida, o mientras no haya kilómetros, el envío es 0. Los kilómetros se obtienen por carretera entre un punto fijo (la tienda) y la dirección escrita, usando OpenStreetMap (Nominatim para ubicar la dirección y OSRM para la ruta), sin clave de API. **Todas estas variables las lee solo el servidor**: la tarifa llega al formulario de venta como dato de la página, no como variable pública.
+El precio se calcula como kilómetros × tarifa por km, redondeado hacia arriba a la unidad (4.7 km × 1.7 = 7.99 → 8) y nunca por debajo del precio mínimo. En una recogida, o mientras no haya kilómetros, el envío es 0. Los kilómetros se obtienen por carretera entre un punto fijo (la tienda) y la dirección escrita, usando OpenStreetMap (Nominatim para ubicar la dirección y OSRM para la ruta), sin clave de API. **Todas estas variables las lee solo el servidor**: la tarifa llega al formulario de venta como dato de la página, no como variable pública.
+
+La tarifa por km y el precio mínimo se cambian desde **Parámetros** (`/admin/parametros`, solo administrador), que los guarda en la tabla `settings`. Cada valor se toma de ahí; si nunca se guardó, de `DELIVERY_RATE_PER_KM` / `DELIVERY_MIN_PRICE`, y si tampoco existen, del valor por defecto. Un cambio aplica a las ventas nuevas o editadas: las ya registradas conservan su precio de envío.
 
 | Variable                  | Obligatoria | Por defecto | Descripción                                                                                   |
 | ------------------------- | :---------: | ----------- | --------------------------------------------------------------------------------------------- |
-| `DELIVERY_RATE_PER_KM`    |     No      | `1.7`       | Tarifa por kilómetro, en la moneda de la tienda                                               |
-| `DELIVERY_MIN_PRICE`      |     No      | `8`         | Precio mínimo del envío: por debajo de este valor siempre se cobra el mínimo                  |
+| `DELIVERY_RATE_PER_KM`    |     No      | `1.7`       | Tarifa por kilómetro, en la moneda de la tienda (si no se configuró en Parámetros)            |
+| `DELIVERY_MIN_PRICE`      |     No      | `8`         | Precio mínimo del envío (si no se configuró en Parámetros)                                     |
 | `STORE_ORIGIN_LAT`        |     Sí      | —           | Latitud del punto de salida. En Google Maps: clic derecho sobre la tienda y copia las coordenadas |
 | `STORE_ORIGIN_LNG`        |     Sí      | —           | Longitud del punto de salida                                                                  |
 | `STORE_ORIGIN_LABEL`      |     No      | `la tienda` | Nombre que se muestra como origen                                                             |

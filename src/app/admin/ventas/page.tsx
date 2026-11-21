@@ -5,7 +5,7 @@ import { getInventoryOwners, getProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
 import { getCurrentSession } from '@/lib/session';
-import { readShippingRate } from '@/lib/shipping-rate';
+import { getShippingRate } from '@/lib/shipping-rate';
 
 import { NewSaleButton } from './NewSaleButton';
 import { NewSalePanel } from './NewSalePanel';
@@ -32,7 +32,7 @@ export default async function SalesPage() {
     return <FeedbackMessage tone="error" message={(failure as { error: string }).error} />;
   }
 
-  const shippingRate = readShippingRate();
+  const shippingRate = await getShippingRate();
 
   return (
     <section className="space-y-6">

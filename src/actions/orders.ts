@@ -8,8 +8,8 @@ import { revalidatePath } from 'next/cache';
 import { executeAction } from '@/lib/action-runner';
 import { ActionResult } from '@/lib/action-result';
 import { OPEN_DELIVERY_STATUSES } from '@/lib/constants';
-import { calculateShippingPrice } from '@/lib/shipping';
-import { readShippingRate } from '@/lib/shipping-rate';
+import { calculateShippingPrice, type ShippingRate } from '@/lib/shipping';
+import { getShippingRate } from '@/lib/shipping-rate';
 import { OrderNotFoundError, ValidationError } from '@/lib/errors';
 import { applyStockChange } from '@/lib/inventory-movements';
 import { effectiveCostPrice, effectiveSalePrice } from '@/lib/inventory-prices';
@@ -132,7 +132,7 @@ export async function createOrder(input: OrderInput): Promise<ActionResult<Order
   return executeAction('orders.createOrder', async (trace) => {
     const session = await requireRole(...INVENTORY_ROLES);
 
-    const orderData = parseOrderInput(input);
+    const orderData = parseOrderInput(input, await getShippingRate());
     const sellerId = await resolveActingOwnerId(session, input.sellerId);
     const orderId = randomUUID();
     trace.addStep(`datos-validados:${orderData.items.length}-items`);
@@ -193,7 +193,7 @@ export async function updateOrder(orderId: string, input: OrderInput): Promise<A
     const session = await requireRole(...INVENTORY_ROLES);
     trace.setBusinessId(orderId);
 
-    const orderData = parseOrderInput(input);
+    const orderData = parseOrderInput(input, await getShippingRate());
 
     const updatedOrder = await prisma.$transaction(async (transaction) => {
       const currentOrder = await transaction.order.findUnique({
@@ -363,7 +363,7 @@ async function ensureOrderAccess(session: SessionPayload, orderId: string): Prom
   }
 }
 
-function parseOrderInput(input: OrderInput) {
+function parseOrderInput(input: OrderInput, shippingRate: ShippingRate) {
   const kind = input.kind === undefined ? OrderKind.SALE : requireEnumValue(input.kind, OrderKind, 'tipo de venta');
   const isErrand = kind === OrderKind.ERRAND;
   // Un tramite siempre es a domicilio: alguien va a la direccion a cobrar.
@@ -371,7 +371,7 @@ function parseOrderInput(input: OrderInput) {
   const isDelivery = deliveryMethod === DeliveryMethod.DELIVERY;
   const distanceKm = isDelivery ? optionalNonNegativeNumber(input.distanceKm, 'kilometros') : null;
 
-  const shippingPrice = calculateShippingPrice(distanceKm ?? 0, readShippingRate());
+  const shippingPrice = calculateShippingPrice(distanceKm ?? 0, shippingRate);
   // Un tramite no lleva productos; una venta puede ir sin productos (por ejemplo, solo delivery).
   const items = isErrand ? [] : mergeDuplicatedItems(input.items);
   // El monto a cobrar es solo del tramite: al pasar a venta de productos se descarta.

@@ -14,12 +14,13 @@ const ALL_ROUTES = [
   DELIVERIES_ROUTE,
   CHAT_ROUTE,
   '/admin/usuarios',
+  '/admin/parametros',
   '/admin/cuenta',
 ];
 
-const ADMIN_ONLY_ROUTES = ['/admin/usuarios', '/admin/catalogo'];
+const ADMIN_ONLY_ROUTES = ['/admin/usuarios', '/admin/catalogo', '/admin/parametros'];
 
-/** Rutas del panel permitidas por rol. ADMIN ve todo; TENDERO y REVENDEDOR todo salvo usuarios y catalogo; DOMICILIARIO solo entregas, chat y su cuenta. */
+/** Rutas del panel permitidas por rol. ADMIN ve todo; TENDERO y REVENDEDOR todo salvo usuarios, catalogo y parametros; DOMICILIARIO solo entregas, chat y su cuenta. */
 export const ROLE_ROUTES: Record<Role, string[]> = {
   ADMIN: ALL_ROUTES,
   STAFF: ALL_ROUTES.filter((route) => !ADMIN_ONLY_ROUTES.includes(route)),

@@ -10,7 +10,7 @@ import { formatUserLabel } from '@/lib/format';
 import { getCurrentSession } from '@/lib/session';
 
 import { InventoryActions } from './InventoryActions';
-import { InventoryTable } from './InventoryTable';
+import { InventoryView } from './InventoryView';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,7 +76,12 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
         partners={partners}
         resellers={resellers}
       />
-      <InventoryTable products={productsResult.data} />
+      <InventoryView
+        ownerId={ownerId}
+        products={productsResult.data}
+        canEditAll={isAdmin}
+        isResellerInventory={owner?.role === 'RESELLER'}
+      />
     </section>
   );
 }

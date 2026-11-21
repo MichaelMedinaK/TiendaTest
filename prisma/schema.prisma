@@ -76,6 +76,7 @@ model User {
   paymentsVoided     Payment[]           @relation("PaymentVoidedBy")
   chatSent           ChatMessage[]       @relation("ChatSent")
   chatReceived       ChatMessage[]       @relation("ChatReceived")
+  settingsUpdated    Setting[]           @relation("SettingUpdatedBy")
 
   @@index([supplierId])
   @@map("users")
@@ -223,4 +224,16 @@ model ChatMessage {
   @@index([recipientId, readAt])
   @@index([senderId, recipientId])
   @@map("chat_messages")
+}
+
+// Parametro de la tienda editable desde el panel (clave -> valor). Sin fila, se usa la variable de entorno
+// del mismo nombre y, si tampoco existe, el valor por defecto del codigo (ver src/lib/settings.ts).
+model Setting {
+  key         String   @id
+  value       String
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("SettingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("settings")
 }

@@ -1,6 +1,17 @@
 'use client';
 
-import { Boxes, LayoutList, MapPin, MessageCircle, Package, ShoppingCart, Truck, UserCog, Users } from 'lucide-react';
+import {
+  Boxes,
+  LayoutList,
+  MapPin,
+  MessageCircle,
+  Package,
+  ShoppingCart,
+  SlidersHorizontal,
+  Truck,
+  UserCog,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -24,6 +35,7 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
   { href: '/admin/inventario', label: 'Inventario', icon: Package },
   { href: '/admin/catalogo', label: 'Catalogo', icon: Boxes },
   { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+  { href: '/admin/parametros', label: 'Parametros', icon: SlidersHorizontal },
   { href: '/admin/cuenta', label: 'Mi cuenta', icon: UserCog },
 ];
 
