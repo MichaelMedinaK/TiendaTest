@@ -32,6 +32,7 @@ import {
 } from '@/lib/validation';
 
 const SALES_ROUTE = '/admin/ventas';
+const MAX_BULK_DELETE = 200;
 const INVENTORY_ROUTE = '/admin/inventario';
 const DASHBOARD_ROUTE = '/admin/dashboard';
 const REPORT_ROUTE = '/admin/reporte';
@@ -348,6 +349,57 @@ export async function deleteOrder(orderId: string): Promise<ActionResult<void>> 
     trace.addStep('venta-eliminada-stock-devuelto');
 
     revalidateSalesViews();
+  });
+}
+
+/**
+ * Elimina varias ventas a la vez (solo el administrador) y devuelve sus unidades al inventario. Es todo o nada: si una
+ * falla, ninguna se elimina.
+ */
+export async function deleteOrders(orderIds: string[]): Promise<ActionResult<{ deletedCount: number }>> {
+  return executeAction('orders.deleteOrders', async (trace) => {
+    const session = await requireRole('ADMIN');
+
+    const ids = [...new Set(Array.isArray(orderIds) ? orderIds.filter((id) => typeof id === 'string' && id) : [])];
+
+    if (ids.length === 0) {
+      throw new ValidationError('Selecciona al menos una venta');
+    }
+
+    if (ids.length > MAX_BULK_DELETE) {
+      throw new ValidationError(`Se pueden eliminar hasta ${MAX_BULK_DELETE} ventas a la vez`);
+    }
+
+    await prisma.$transaction(
+      async (transaction) => {
+        const orders = await transaction.order.findMany({ where: { id: { in: ids } }, include: { items: true } });
+
+        if (orders.length !== ids.length) {
+          const found = new Set(orders.map((order) => order.id));
+          throw new OrderNotFoundError(ids.find((id) => !found.has(id)) ?? '');
+        }
+
+        for (const order of orders) {
+          await syncStock(transaction, {
+            sellerId: order.sellerId,
+            userId: session.userId,
+            orderId: order.id,
+            previous: holdsStock(order.deliveryStatus) ? order.items : [],
+            next: [],
+            returnReason: 'Venta eliminada',
+            saleReason: 'Venta eliminada',
+          });
+        }
+
+        await transaction.order.deleteMany({ where: { id: { in: ids } } });
+      },
+      { timeout: 30_000 },
+    );
+
+    trace.addStep(`ventas-eliminadas:${ids.length}`);
+
+    revalidateSalesViews();
+    return { deletedCount: ids.length };
   });
 }
 

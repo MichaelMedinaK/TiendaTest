@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import type { DeliveryStatus, PaymentStatus } from '@prisma/client';
 
-import { type OrderWithItems, deleteOrder, updateDeliveryStatus } from '@/actions/orders';
+import { type OrderWithItems, deleteOrder, deleteOrders, updateDeliveryStatus } from '@/actions/orders';
 import type { InventoryProduct } from '@/actions/products';
 import { PaidByMethod, PaymentsPanel } from '@/components/PaymentsControl';
 import { StatusSelect } from '@/components/StatusSelect';
@@ -36,6 +36,7 @@ import { PeriodSummary } from './PeriodSummary';
 
 const DELIVERY_STATUS_OPTIONS = toSelectOptions(DELIVERY_STATUS_LABELS);
 const COLUMN_COUNT = 7;
+const CHECKBOX_CLASS = 'h-4 w-4 cursor-pointer rounded border-zinc-300 accent-indigo-600 disabled:cursor-not-allowed';
 const ALL = 'ALL';
 
 type PaymentFilter = typeof ALL | PaymentStatus;
@@ -138,20 +139,27 @@ export function OrdersTable({
   products,
   shippingRate,
   showSeller = false,
+  canBulkDelete = false,
 }: {
   orders: OrderWithItems[];
   products: InventoryProduct[];
   shippingRate: ShippingRate;
   /** Muestra de que inventario salio cada venta (util para el administrador). */
   showSeller?: boolean;
+  /** Permite seleccionar varias ventas y eliminarlas juntas (solo el administrador). */
+  canBulkDelete?: boolean;
 }) {
   const router = useRouter();
+  const feedback = useFeedback();
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [paymentsOrderId, setPaymentsOrderId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>(ALL);
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>(ALL);
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>(DEFAULT_SUMMARY_PERIOD);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, startDeleting] = useTransition();
+  const columnCount = canBulkDelete ? COLUMN_COUNT + 1 : COLUMN_COUNT;
 
   // Tras persistir un cambio se refresca el server component para recalcular stock y metricas.
   const refreshAfter = async <TResult,>(action: Promise<TResult>): Promise<TResult> => {
@@ -172,6 +180,49 @@ export function OrdersTable({
       (normalizedSearch === '' || buildSearchText(order).includes(normalizedSearch)),
   );
   const isFiltered = paymentFilter !== ALL || deliveryFilter !== ALL || normalizedSearch !== '';
+  // Solo cuentan las seleccionadas que siguen a la vista: lo que un filtro oculta nunca se elimina sin querer.
+  const selectedOrders = visibleOrders.filter((order) => selectedIds.has(order.id));
+  const areAllVisibleSelected = visibleOrders.length > 0 && selectedOrders.length === visibleOrders.length;
+
+  const toggleSelected = (orderId: string) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(orderId)) next.add(orderId);
+      return next;
+    });
+
+  const toggleAllVisible = () =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      visibleOrders.forEach((order) => (areAllVisibleSelected ? next.delete(order.id) : next.add(order.id)));
+      return next;
+    });
+
+  const handleBulkDelete = async () => {
+    const count = selectedOrders.length;
+    const confirmed = await feedback.confirm({
+      title: `Eliminar ${count} ${count === 1 ? 'venta' : 'ventas'}`,
+      message: `Se eliminaran ${count} ${count === 1 ? 'venta' : 'ventas'} y el stock de cada una volvera al inventario. Esta accion no se puede deshacer.`,
+      confirmLabel: `Eliminar ${count}`,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    startDeleting(async () => {
+      const result = await deleteOrders(selectedOrders.map((order) => order.id));
+
+      if (!result.success) {
+        feedback.error(result.error);
+        return;
+      }
+
+      setSelectedIds(new Set());
+      feedback.success(`${result.data.deletedCount} ${result.data.deletedCount === 1 ? 'venta eliminada' : 'ventas eliminadas'}`);
+      router.refresh();
+    });
+  };
 
   return (
     <div className="space-y-3">
@@ -234,10 +285,50 @@ export function OrdersTable({
         </div>
       </div>
 
+      {canBulkDelete && selectedOrders.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2">
+          <p className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">
+            <span className="font-semibold">{selectedOrders.length}</span>{' '}
+            {selectedOrders.length === 1 ? 'venta seleccionada' : 'ventas seleccionadas'}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="inline-flex h-8 items-center rounded-lg border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              disabled={isDeleting}
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Quitar seleccion
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isDeleting}
+              onClick={handleBulkDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeleting ? 'Eliminando...' : `Eliminar ${selectedOrders.length}`}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={`overflow-x-auto rounded-xl border bg-white dark:bg-zinc-900/40 ${SHEET_ROW_BORDER}`}>
         <table className="w-full min-w-[60rem] border-collapse text-sm">
           <thead className={`border-b bg-zinc-50 dark:bg-zinc-900/80 ${SHEET_ROW_BORDER}`}>
             <tr className={SHEET_ROW_DIVIDERS}>
+              {canBulkDelete && (
+                <th className={`${HEAD_CELL_CLASS} w-10 text-center`}>
+                  <input
+                    type="checkbox"
+                    aria-label="Seleccionar todas las ventas visibles"
+                    className={CHECKBOX_CLASS}
+                    checked={areAllVisibleSelected}
+                    disabled={visibleOrders.length === 0 || isDeleting}
+                    onChange={toggleAllVisible}
+                  />
+                </th>
+              )}
               <th className={HEAD_CELL_CLASS}>Venta / Destino</th>
               <th className={HEAD_CELL_CLASS}>Fecha</th>
               <th className={HEAD_CELL_CLASS}>Productos</th>
@@ -251,7 +342,7 @@ export function OrdersTable({
           {visibleOrders.length === 0 && (
             <tbody>
               <tr>
-                <td colSpan={COLUMN_COUNT} className={`px-4 py-8 text-center text-sm ${MUTED_TEXT}`}>
+                <td colSpan={columnCount} className={`px-4 py-8 text-center text-sm ${MUTED_TEXT}`}>
                   Ninguna venta coincide con los filtros.
                 </td>
               </tr>
@@ -274,7 +365,23 @@ export function OrdersTable({
                   editingOrderId === order.id ? 'bg-indigo-500/5' : ''
                 }`}
               >
-                <tr className={`transition hover:bg-zinc-50 dark:hover:bg-zinc-800/30 ${SHEET_ROW_DIVIDERS}`}>
+                <tr
+                  className={`transition hover:bg-zinc-50 dark:hover:bg-zinc-800/30 ${SHEET_ROW_DIVIDERS} ${
+                    selectedIds.has(order.id) ? 'bg-red-500/5' : ''
+                  }`}
+                >
+                  {canBulkDelete && (
+                    <td className={`${CELL_CLASS} w-10 text-center`}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Seleccionar ${order.reference}`}
+                        className={CHECKBOX_CLASS}
+                        checked={selectedIds.has(order.id)}
+                        disabled={isDeleting}
+                        onChange={() => toggleSelected(order.id)}
+                      />
+                    </td>
+                  )}
                   <td className={`${CELL_CLASS} min-w-[18rem] max-w-md`}>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span
@@ -384,7 +491,7 @@ export function OrdersTable({
 
                 {isPaymentsOpen && (
                   <tr className={`border-t bg-zinc-50 dark:bg-zinc-900/60 ${SHEET_ROW_BORDER}`}>
-                    <td colSpan={COLUMN_COUNT} className="p-4">
+                    <td colSpan={columnCount} className="p-4">
                       <PaymentsPanel order={order} />
                     </td>
                   </tr>
@@ -392,7 +499,7 @@ export function OrdersTable({
 
                 {editingOrderId === order.id && (
                   <tr className={`border-t bg-zinc-50 dark:bg-zinc-900/60 ${SHEET_ROW_BORDER}`}>
-                    <td colSpan={COLUMN_COUNT} className="p-4">
+                    <td colSpan={columnCount} className="p-4">
                       <OrderForm
                         products={products}
                         shippingRate={shippingRate}

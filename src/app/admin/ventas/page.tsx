@@ -58,6 +58,7 @@ export default async function SalesPage() {
           products={productsResult.data}
           shippingRate={shippingRate}
           showSeller={session.role === 'ADMIN'}
+          canBulkDelete={session.role === 'ADMIN'}
         />
       </div>
     </section>
