@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { getOrders } from '@/actions/orders';
-import { getInventoryOwners, getProducts } from '@/actions/products';
+import { getInventoryOwners, getSellableProducts } from '@/actions/products';
 import { FeedbackMessage } from '@/components/ui/FeedbackMessage';
 import { LOGIN_ROUTE } from '@/lib/constants';
 import { getCurrentSession } from '@/lib/session';
@@ -22,7 +22,7 @@ export default async function SalesPage() {
 
   // 'ALL': el administrador vende desde cualquier inventario; un tendero recibe solo el suyo.
   const [productsResult, ordersResult, ownersResult] = await Promise.all([
-    getProducts('ALL'),
+    getSellableProducts('ALL'),
     getOrders(),
     getInventoryOwners(),
   ]);

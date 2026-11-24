@@ -426,7 +426,7 @@ function holdsStock(status: DeliveryStatus): boolean {
  * Fija precios y costos de cada linea. El precio es, en orden: el indicado en la venta, el ya pactado (al editar,
  * para que cambiar el catalogo no altere ventas existentes) o el actual del inventario del vendedor (su precio propio
  * o, si no tiene, el del catalogo). El costo sigue la misma regla con el costo del vendedor.
- * Solo se admiten productos que esten en el inventario del vendedor.
+ * Si el producto del catalogo aun no esta en el inventario del vendedor, se agrega con stock 0.
  */
 async function buildOrderItems(
   transaction: TransactionClient,
@@ -434,8 +434,19 @@ async function buildOrderItems(
   sellerId: string,
   agreed: { prices: Map<string, number>; costs: Map<string, number> } = { prices: new Map(), costs: new Map() },
 ) {
+  // Se puede vender un producto del catalogo que aun no esta en el inventario: se crea con stock 0.
+  const requestedIds = [...new Set(requestedItems.map((item) => item.productId))];
+  const activeProducts = await transaction.product.findMany({
+    where: { id: { in: requestedIds }, isActive: true },
+    select: { id: true },
+  });
+  await transaction.inventoryItem.createMany({
+    data: activeProducts.map((product) => ({ ownerId: sellerId, productId: product.id })),
+    skipDuplicates: true,
+  });
+
   const inventoryItems = await transaction.inventoryItem.findMany({
-    where: { ownerId: sellerId, productId: { in: requestedItems.map((item) => item.productId) } },
+    where: { ownerId: sellerId, productId: { in: requestedIds } },
     include: { product: { select: { price: true, costPrice: true } }, owner: { select: { role: true } } },
   });
   const itemsByProduct = new Map(inventoryItems.map((item) => [item.productId, item]));

@@ -28,6 +28,10 @@ Sí puedes ejecutar libremente contra bases **locales o temporales** (por ejempl
 
 `npm run lint` queda esperando una configuración interactiva de ESLint (pendiente en el repo). **No lo uses para validar**: usa `npm run typecheck`.
 
+## Commit y push
+
+Al terminar cada tarea que cambie archivos y pase `npm run typecheck`, **pregunta al usuario** (con `ask_user`) si quiere hacer commit y push. Solo si responde que sí: `git add -A`, commit con mensaje en español que describa el cambio y `git push`. Nunca lo hagas sin confirmación y nunca incluyas `.env`.
+
 ## Base de datos
 
 - **No hay migraciones versionadas.** El flujo es `prisma db push`; no existe `prisma/migrations/` y no debe introducirse `prisma migrate dev` sin acordarlo: con el esquema creado por `db push`, Prisma detecta drift y ofrece **resetear la base**.

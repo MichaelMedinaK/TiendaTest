@@ -131,6 +131,49 @@ export async function getProducts(owner?: string): Promise<ActionResult<Inventor
   });
 }
 
+/**
+ * Productos para vender: los del inventario mas los del catalogo que el dueno aun no tiene (stock 0, sin
+ * `inventoryItemId`). Al vender uno de estos, la venta crea su registro de inventario y el stock queda en negativo.
+ */
+export async function getSellableProducts(owner?: string): Promise<ActionResult<InventoryProduct[]>> {
+  return executeAction('products.getSellableProducts', async () => {
+    const session = await requireRole(...INVENTORY_ROLES);
+    const ownerFilter = resolveOwnerFilter(session, owner, false);
+
+    const [items, catalog, owners] = await Promise.all([
+      prisma.inventoryItem.findMany({ where: ownerFilter, include: ITEM_WITH_PRODUCT }),
+      prisma.product.findMany({ where: { isActive: true } }),
+      prisma.user.findMany({
+        where: { isActive: true, role: { in: INVENTORY_ROLES }, ...(ownerFilter.ownerId ? { id: ownerFilter.ownerId } : {}) },
+        select: { id: true },
+      }),
+    ]);
+
+    const products = items.map(toInventoryProduct);
+    const owned = new Set(items.map((item) => `${item.ownerId}:${item.productId}`));
+
+    for (const { id: ownerId } of owners) {
+      for (const product of catalog) {
+        if (!owned.has(`${ownerId}:${product.id}`)) {
+          products.push({
+            id: product.id,
+            inventoryItemId: '',
+            ownerId,
+            name: product.name,
+            sku: product.sku,
+            costPrice: product.costPrice,
+            price: product.price,
+            customSalePrice: null,
+            stock: 0,
+          });
+        }
+      }
+    }
+
+    return products.sort((a, b) => a.name.localeCompare(b.name));
+  });
+}
+
 /** Usuarios con inventario propio: el administrador ve a todos los activos; los demas, solo a si mismos. */
 export async function getInventoryOwners(): Promise<ActionResult<InventoryOwner[]>> {
   return executeAction('products.getInventoryOwners', async () => {
