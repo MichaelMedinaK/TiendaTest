@@ -158,6 +158,7 @@ export async function createOrder(input: OrderInput): Promise<ActionResult<Order
         data: {
           id: orderId,
           ...orderData.fields,
+          deliveredAt: deliveryTimestamp(orderData.fields.deliveryStatus),
           sellerId,
           total: orderTotal,
           paymentStatus: isPaid ? PaymentStatus.PAID : PaymentStatus.PENDING,
@@ -228,6 +229,7 @@ export async function updateOrder(orderId: string, input: OrderInput): Promise<A
         where: { id: orderId },
         data: {
           ...orderData.fields,
+          deliveredAt: deliveryTimestamp(orderData.fields.deliveryStatus, currentOrder.deliveryStatus),
           total: withCharges(total, orderData.fields),
           items: { deleteMany: {}, create: orderItems },
         },
@@ -304,7 +306,10 @@ export async function updateDeliveryStatus(
 
       return transaction.order.update({
         where: { id: orderId },
-        data: { deliveryStatus: newDeliveryStatus },
+        data: {
+          deliveryStatus: newDeliveryStatus,
+          deliveredAt: deliveryTimestamp(newDeliveryStatus, currentOrder.deliveryStatus),
+        },
         include: ORDER_WITH_ITEMS,
       });
     });
@@ -472,6 +477,12 @@ function parseSchedule(input: OrderInput) {
 /** Una venta cancelada no mantiene stock reservado: sus unidades vuelven al inventario. */
 function holdsStock(status: DeliveryStatus): boolean {
   return status !== DeliveryStatus.CANCELLED;
+}
+
+function deliveryTimestamp(next: DeliveryStatus, previous?: DeliveryStatus): Date | null | undefined {
+  if (next !== DeliveryStatus.DELIVERED) return null;
+  // Una edicion que no cambia el estado conserva la fecha, incluso si es una entrega antigua sin fecha.
+  return previous === next ? undefined : new Date();
 }
 
 /**

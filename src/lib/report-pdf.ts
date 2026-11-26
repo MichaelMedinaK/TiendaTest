@@ -8,8 +8,8 @@ import {
   formatCurrency,
   formatDateTime,
   formatProductLabel,
-  formatSchedule,
   formatUserLabel,
+  toStoreDay,
 } from './format';
 import {
   DELIVERY_METHOD_LABELS,
@@ -17,8 +17,9 @@ import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
 } from './labels';
-import { getBalance, getPaidAmount } from './payments-view';
-import { type ReportPeriod, type ReportSummary } from './report-summary';
+import { getBalance, getPaidAmount, getPaidByMethod } from './payments-view';
+import type { ReportStockRow, Settlement } from './report-closing';
+import { itemsRevenue, type ReportPeriod, type ReportSummary } from './report-summary';
 
 export interface ReportPdfInput {
   /** A quien pertenece el reporte ("Todos los inventarios" o el nombre del usuario). */
@@ -26,6 +27,8 @@ export interface ReportPdfInput {
   period: ReportPeriod;
   summary: ReportSummary;
   orders: OrderWithItems[];
+  stockRows: ReportStockRow[];
+  settlement: Settlement;
   showSellers: boolean;
 }
 
@@ -57,6 +60,20 @@ interface TableRow {
 /** Las fuentes estandar del PDF solo cubren Latin-1: lo demas se reemplaza para no romper la generacion. */
 function sanitize(text: string): string {
   return text.replace(/\s+/g, ' ').replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+}
+
+function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
+  let remaining = sanitize(text).trim();
+  const lines: string[] = [];
+  while (font.widthOfTextAtSize(remaining, size) > width) {
+    let end = 1;
+    while (end < remaining.length && font.widthOfTextAtSize(remaining.slice(0, end + 1), size) <= width) end++;
+    const space = remaining.lastIndexOf(' ', end);
+    const cut = space > 0 ? space : end;
+    lines.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut).trimStart();
+  }
+  return [...lines, remaining];
 }
 
 class PdfWriter {
@@ -177,18 +194,24 @@ class PdfWriter {
     }
 
     for (const row of rows) {
-      const details = row.details ?? [];
-
-      // La fila y sus detalles se mantienen juntos; si no caben, la fila pasa a la pagina siguiente.
-      if (this.y - ROW_HEIGHT * (1 + details.length) < MARGIN) {
-        this.addPage();
-        drawHeader();
+      const ensureRowSpace = (height: number) => {
+        if (this.y - height < MARGIN) {
+          this.addPage();
+          drawHeader();
+        }
+      };
+      const cells = columns.map((column, i) => wrap(row.cells[i] ?? '', this.font, BODY_SIZE, column.width - 8));
+      const details = (row.details ?? []).flatMap((line) => wrap(line, this.font, 8, CONTENT_WIDTH - 18));
+      const lines = Math.max(...cells.map((cell) => cell.length));
+      const height = lines * ROW_HEIGHT + details.length * (ROW_HEIGHT - 3);
+      ensureRowSpace(Math.min(height, PAGE_HEIGHT - MARGIN * 2 - ROW_HEIGHT));
+      for (let i = 0; i < lines; i++) {
+        ensureRowSpace(ROW_HEIGHT);
+        this.drawCells(columns, cells.map((cell) => cell[i] ?? ''), this.font);
+        this.y -= ROW_HEIGHT;
       }
-
-      this.drawCells(columns, row.cells, this.font);
-      this.y -= ROW_HEIGHT;
-
       for (const detail of details) {
+        ensureRowSpace(ROW_HEIGHT - 3);
         this.draw(detail, MARGIN + 14, 8, this.font, MUTED, CONTENT_WIDTH - 18);
         this.y -= ROW_HEIGHT - 3;
       }
@@ -247,10 +270,6 @@ function orderDetails(order: OrderWithItems): string[] {
     lines.push('Pedido sin productos');
   }
 
-  if (order.shippingPrice > 0) {
-    lines.push(`Envio: ${formatCurrency(order.shippingPrice)}`);
-  }
-
   if (order.extraAmount > 0) {
     lines.push(`Monto a cobrar: ${formatCurrency(order.extraAmount)}`);
   }
@@ -271,14 +290,63 @@ export async function buildReportPdf(input: ReportPdfInput): Promise<Uint8Array>
     `Generado el ${formatDateTime(new Date())}`,
   ]);
 
-  writer.heading('Resumen');
+  writer.heading('Stock inicial y stock esperado al cierre');
+  writer.note('Inicial + otros movimientos - ventas netas = esperado. La primera carga se incluye en el inicial.');
+  writer.note('Se descuentan las ventas registradas, incluso por entregar. Un negativo indica unidades por reponer.');
+  writer.table([
+    { header: 'Producto / inventario', width: 222 },
+    { header: 'Inicial', width: 60, align: 'right' },
+    { header: 'Otros mov.', width: 77, align: 'right' },
+    { header: 'Ventas netas', width: 78, align: 'right' },
+    { header: 'Esperado', width: 78, align: 'right' },
+  ], input.stockRows.map((row) => ({
+    cells: [formatProductLabel(row), String(row.initial), String(row.other), String(row.sold), String(row.stock)],
+    details: input.showSellers ? [`Inventario: ${row.owner}`] : [],
+  })), 'Sin productos en este inventario al cierre.');
+
+  writer.heading('Detalle de ventas');
+  writer.table([
+    { header: 'Fecha', width: 63 }, { header: 'Referencia', width: 134 },
+    { header: 'Sin envio', width: 80, align: 'right' }, { header: 'Envio', width: 68, align: 'right' },
+    { header: 'Total venta', width: 84, align: 'right' }, { header: 'Cobrado*', width: 86, align: 'right' },
+  ], orders.map((order) => {
+    const methods = getPaidByMethod(order.payments);
+    const status = order.deliveryStatus === 'CANCELLED' ? 'Cancelado' : DELIVERY_STATUS_LABELS[order.deliveryStatus];
+    return {
+      cells: [
+        toStoreDay(order.createdAt), order.reference, formatCurrency(itemsRevenue(order) + order.extraAmount),
+        formatCurrency(order.shippingPrice), formatCurrency(order.total), formatCurrency(getPaidAmount(order.payments)),
+      ],
+      details: [
+        ...(input.showSellers ? [`Vendedor: ${formatUserLabel(order.seller)}`] : []),
+        `Entrega: ${order.address || DELIVERY_METHOD_LABELS[order.deliveryMethod]} (${status})`,
+        ...orderDetails(order),
+        `Pago: ${PAYMENT_STATUS_LABELS[order.paymentStatus]} - ${methods.map(({ method, amount }) => `${PAYMENT_METHOD_LABELS[method]} ${formatCurrency(amount)}`).join(' + ') || 'Sin cobros'}`,
+        ...(order.deliveryStatus === 'CANCELLED' ? [] : [`Saldo: ${formatCurrency(getBalance(order.total, order.payments))}`]),
+      ],
+    };
+  }), 'Sin ventas registradas en este periodo.');
+  writer.note('* Total cobrado de cada venta a la fecha del informe. La rendicion usa la fecha de cada cobro.');
+
+  const { cash, transfers, deliveryFees, net, undatedFees } = input.settlement;
+  writer.heading('Rendicion a la tendera');
+  writer.figures([
+    ['Efectivo recibido en el periodo', formatCurrency(cash)],
+    ['Transferencias (fuera del efectivo)', formatCurrency(transfers)],
+    ['Deliverys realizados a descontar', formatCurrency(deliveryFees)],
+    [net < 0 ? 'Falta para cubrir deliverys' : 'Efectivo a entregar', formatCurrency(Math.abs(net))],
+  ]);
+  writer.note('Efectivo recibido menos envios entregados, incluso los pagados por transferencia. Sin cobros anulados.');
+  if (undatedFees > 0) writer.note(`Rendicion parcial: ${formatCurrency(undatedFees)} de envios antiguos sin fecha no se descontaron.`);
+
+  writer.heading('Resumen de las ventas del periodo');
   writer.figures([
     ['Pedidos (sin cancelados)', String(summary.ordersCount)],
     ['Pedidos cancelados', String(summary.cancelledCount)],
     ['Total vendido', formatCurrency(summary.totalSold)],
     ['Ticket promedio', formatCurrency(summary.averageTicket)],
     ['Venta de productos', formatCurrency(summary.productsRevenue)],
-    ['Delivery cobrado en envios', formatCurrency(summary.shippingRevenue)],
+    ['Envios facturados', formatCurrency(summary.shippingRevenue)],
     ['Montos a cobrar (tramites)', formatCurrency(summary.extraRevenue)],
     ['Unidades vendidas', String(summary.unitsSold)],
     ['Pedidos solo delivery', String(summary.deliveryOnlyCount)],
@@ -286,7 +354,7 @@ export async function buildReportPdf(input: ReportPdfInput): Promise<Uint8Array>
     ['Ganancia (productos, sin envios)', formatCurrency(summary.productsRevenue - summary.productsCost)],
   ]);
 
-  writer.heading('Dinero recogido');
+  writer.heading('Cobros vigentes de estas ventas');
   writer.figures([
     [PAYMENT_METHOD_LABELS.CASH, formatCurrency(summary.collectedByMethod.CASH)],
     [PAYMENT_METHOD_LABELS.TRANSFER, formatCurrency(summary.collectedByMethod.TRANSFER)],
@@ -343,45 +411,7 @@ export async function buildReportPdf(input: ReportPdfInput): Promise<Uint8Array>
     'No se vendieron productos en este periodo.',
   );
 
-  writer.heading('Pedidos');
-  writer.table(
-    [
-      { header: 'Fecha', width: 68 },
-      { header: 'Referencia', width: 165 },
-      { header: 'Entrega', width: 62 },
-      { header: 'Total', width: 70, align: 'right' },
-      { header: 'Cobrado', width: 70, align: 'right' },
-      { header: 'Saldo', width: 80, align: 'right' },
-    ],
-    orders.map((order) => {
-      const cancelled = order.deliveryStatus === DeliveryStatus.CANCELLED;
-      const seller = input.showSellers ? ` (${formatUserLabel(order.seller)})` : '';
-      const delivery = [
-        DELIVERY_METHOD_LABELS[order.deliveryMethod],
-        order.address,
-        formatSchedule(order),
-        DELIVERY_STATUS_LABELS[order.deliveryStatus],
-        `Pago: ${PAYMENT_STATUS_LABELS[order.paymentStatus]}`,
-      ]
-        .filter(Boolean)
-        .join(' - ');
-
-      return {
-        cells: [
-          formatDateTime(order.createdAt),
-          `${order.reference}${seller}`,
-          cancelled ? 'Cancelado' : DELIVERY_STATUS_LABELS[order.deliveryStatus],
-          formatCurrency(order.total),
-          formatCurrency(getPaidAmount(order.payments)),
-          cancelled ? '-' : formatCurrency(getBalance(order.total, order.payments)),
-        ],
-        details: [delivery, ...orderDetails(order)],
-      };
-    }),
-    'Sin pedidos en este periodo.',
-  );
-
-  writer.heading('Inventario');
+  writer.heading('Valor del inventario al cierre');
   writer.figures([
     ['Unidades en stock', String(summary.stockUnits)],
     ['Stock a precio real', formatCurrency(summary.stockCost)],

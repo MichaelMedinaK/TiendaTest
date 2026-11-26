@@ -228,13 +228,15 @@ En **Reporte** se resume el estado de la tienda: ventas registradas, total vendi
 - La **ganancia** es venta de productos − costo registrado al vender; no incluye el envío ni las ventas canceladas.
 - El **ADMIN** puede filtrar por inventario con el selector **Reporte de** (por defecto, todos) y ve un **resumen por vendedor**. Un STAFF solo ve su propio reporte.
 
-Pulsa **Descargar PDF** para bajar el reporte como archivo. Antes puedes elegir el periodo con los accesos rápidos (**Hoy**, **Ayer**, **Mañana**, **Últimos 7 días**, **Este mes**, **Todo**) o con las fechas **Desde** y **Hasta** (si los dejas vacíos, incluye todo el historial). Cada usuario descarga el PDF de sus propios pedidos y productos; el ADMIN descarga el del inventario elegido en **Reporte de**.
+1. Deja **Todo** para incluir el historial completo o elige fechas. El administrador ve todos los vendedores por defecto; los demás solo ven su propio inventario.
+2. Pulsa **Revisar cierre**. Por producto verás **inicial + otros movimientos − ventas netas = stock esperado**. La primera carga se incluye en el inicial; las reposiciones, salidas y transferencias posteriores van en otros movimientos. Las devoluciones reducen las ventas netas. Por ejemplo: empezaste con 12, recibiste 3 más y vendiste 8; deberías tener **7**. Las ventas registradas descuentan stock aunque aún estén por entregar. Un negativo indica unidades por reponer.
+3. Verifica las unidades físicamente y pulsa **Descargar PDF**. No tienes que escribir el conteo. El PDF corresponde a la vista que revisaste: no ajusta stock ni elimina historial. Si corriges una venta, pulsa **Actualizar cierre** para preparar otra copia.
 
-El PDF incluye:
+El PDF muestra el stock inicial y esperado, y después cada venta: fecha (sin hora), referencia, dirección o recogida, productos, importe sin envío, envío, total y cobros vigentes desglosados por método. También conserva los resúmenes de ventas, ganancia y stock bajo.
 
-- **Resumen:** pedidos y cancelados, total vendido, ticket promedio, venta de productos, delivery cobrado, unidades vendidas, costo y ganancia.
-- **Dinero recogido:** total cobrado en **efectivo** y por **transferencia**, y lo que queda por cobrar (solo cobros vigentes de los pedidos del periodo).
-- **Estado** de envíos y de pagos, **productos vendidos** (unidades y monto), el detalle de cada **pedido** (productos, envío, cobrado y saldo), el **resumen por vendedor** (ADMIN con todos los inventarios) y el **inventario** con el stock bajo.
+**Rendición a la tendera = efectivo recibido − envíos a domicilio realizados.** Los cobros cuentan por la fecha en que se recibieron, incluso si la venta es anterior. No cuentan las transferencias ni los cobros anulados como efectivo. Se descuenta cada envío marcado como entregado según su fecha real de entrega, aunque el cliente haya pagado por transferencia o aún deba. Por ejemplo, con 100 en efectivo y dos envíos de 5, entregas **90**. Si falta dinero para cubrir los envíos, se indica el faltante.
+
+Los envíos entregados antes de que la aplicación empezara a guardar la fecha real de entrega se incluyen en **Todo**. Si filtras por fechas, el informe advierte cuánto queda sin fecha y que la rendición es parcial; no inventa un día de entrega.
 
 También puedes usar **Imprimir / Guardar PDF** para imprimir la pantalla del reporte desde el navegador.
 

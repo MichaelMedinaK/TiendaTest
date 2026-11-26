@@ -1,10 +1,9 @@
 import { DeliveryStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 
 import type { OrderWithItems } from '@/actions/orders';
-import type { InventoryProduct } from '@/actions/products';
 
 import { LOW_STOCK_THRESHOLD } from './constants';
-import { toStoreDay } from './format';
+import { inReportPeriod, type ReportStockRow } from './report-closing';
 import { getBalance, getPaidAmount, roundToCents } from './payments-view';
 
 export interface ReportPeriod {
@@ -52,17 +51,14 @@ export interface ReportSummary {
   paymentStatusCounts: Record<PaymentStatus, number>;
   soldProducts: SoldProductRow[];
   sellers: SellerRow[];
-  lowStockProducts: InventoryProduct[];
+  lowStockProducts: ReportStockRow[];
   stockUnits: number;
   stockCost: number;
   stockValue: number;
 }
 
-export function filterOrdersByPeriod(orders: OrderWithItems[], { from, to }: ReportPeriod): OrderWithItems[] {
-  return orders.filter((order) => {
-    const day = toStoreDay(order.createdAt);
-    return (!from || day >= from) && (!to || day <= to);
-  });
+export function filterOrdersByPeriod(orders: OrderWithItems[], period: ReportPeriod): OrderWithItems[] {
+  return orders.filter((order) => inReportPeriod(order.createdAt, period));
 }
 
 const sumBy = <T>(values: T[], pick: (value: T) => number): number =>
@@ -101,7 +97,7 @@ function countBy<TKey extends string>(keys: TKey[], values: TKey[]): Record<TKey
   return counts;
 }
 
-export function buildReportSummary(orders: OrderWithItems[], products: InventoryProduct[]): ReportSummary {
+export function buildReportSummary(orders: OrderWithItems[], products: ReportStockRow[]): ReportSummary {
   const active = orders.filter((order) => order.deliveryStatus !== DeliveryStatus.CANCELLED);
 
   const productsRevenue = sumBy(active, itemsRevenue);

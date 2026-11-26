@@ -160,6 +160,8 @@ model Order {
   // Se calcula con los cobros no anulados: Pendiente (nada), Parcial (menos que el total) o Pagado.
   paymentStatus  PaymentStatus  @default(PENDING)
   deliveryStatus DeliveryStatus @default(PENDING)
+  // Fecha real de entrega; las entregas anteriores a este registro no tienen fecha conocida.
+  deliveredAt    DateTime?
   total          Float
   createdAt      DateTime       @default(now())
   seller         User           @relation(fields: [sellerId], references: [id])

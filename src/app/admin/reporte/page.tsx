@@ -116,9 +116,9 @@ export default async function ReportPage({ searchParams }: { searchParams?: Prom
         <PrintButton />
       </header>
 
-      <PdfDownload owner={isAdmin ? selectedOwner : undefined} />
-
       {isAdmin && <OwnerSelect owners={owners} value={selectedOwner ?? 'ALL'} includeAll label="Reporte de" />}
+
+      <PdfDownload key={selectedOwner ?? 'propio'} owner={selectedOwner} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {summary.map((item) => (
